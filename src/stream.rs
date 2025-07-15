@@ -28,12 +28,13 @@ impl SockStream {
     /// # Examples
     ///
     /// ```
-    /// use actix_fastcgi::SockStream;
+    /// use actix_fastcgi::{SockStream, Error};
     ///
-    /// async fn connect() {
-    ///   let unix = SockStream::connect("unix:///var/run/program.sock");
-    ///   let tcp  = SockStream::connect("tcp://localhost:9000");
-    ///   let tcp2 = SockStream::connect("192.168.0.2:9000");
+    /// async fn connect() -> Result<(), Error> {
+    ///   let unix = SockStream::connect("unix:///var/run/program.sock").await?;
+    ///   let tcp  = SockStream::connect("tcp://localhost:9000").await?;
+    ///   let tcp2 = SockStream::connect("192.168.0.2:9000").await?;
+    ///   Ok(())
     /// }
     /// ```
     pub async fn connect(addr: &str) -> Result<Self, Error> {

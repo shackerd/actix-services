@@ -21,9 +21,9 @@ use super::error::Error;
 
 const STATUS_HEADER: &str = "Status";
 
-/// FastCGI Stream Buffer Converting Stdout/Stderr Into Meaningful HTTP Response Body
-///
-/// Wraps [`StreamResponse`](fastcgi_client::response::ResponseStream)
+/// Stream buffer for converting
+/// [`StreamResponse`](fastcgi_client::response::ResponseStream) into
+/// [`HttpResponse`](actix_web::HttpResponse)
 pub struct StreamBuf {
     stream: LocalBoxStream<'static, Result<Content, ClientError>>,
     buf: BytesMut,
