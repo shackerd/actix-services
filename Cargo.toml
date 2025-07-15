@@ -1,0 +1,18 @@
+[package]
+name = "actix-fastcgi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-files = { git = "https://github.com/imgurbot12/actix-web.git", branch = "feat/pathbuf", version = "0.6.6" }
+actix-service = "2.0.3"
+actix-web = { version = "4.11.0", default-features = false }
+derive_more = { version = "2.0.1", features = ["display"] }
+fastcgi-client = { git = "https://github.com/jmjoy/fastcgi-client-rs.git", version = "0.9.0" }
+futures-core = { version = "0.3.31", default-features = false }
+futures-util = { version = "0.3.31", default-features = false }
+http = "0.2.7"
+httparse = "1.10.1"
+pin-project = "1.1.10"
+tokio = { version = "1.46.1", default-features = false }
+tracing = "0.1.41"

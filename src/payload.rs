@@ -1,0 +1,119 @@
+//! Stream Abstraction for FastCGI
+
+use std::{
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use actix_web::{
+    HttpResponse,
+    body::BodyStream,
+    error::PayloadError,
+    http::StatusCode,
+    web::{Bytes, BytesMut},
+};
+use fastcgi_client::{ClientError, response::Content};
+use futures_core::{Stream, stream::LocalBoxStream};
+use futures_util::StreamExt;
+
+use super::error::Error;
+
+const STATUS_HEADER: &str = "Status";
+
+/// FastCGI Stream Buffer Converting Stdout/Stderr Into Meaningful HTTP Response Body
+///
+/// Wraps [`StreamResponse`](fastcgi_client::response::ResponseStream)
+pub struct StreamBuf {
+    stream: LocalBoxStream<'static, Result<Content, ClientError>>,
+    buf: BytesMut,
+    eof: Option<usize>,
+}
+
+impl StreamBuf {
+    pub fn new<S>(stream: S) -> Self
+    where
+        S: Stream<Item = Result<Content, ClientError>> + 'static,
+    {
+        Self {
+            stream: Box::pin(stream),
+            buf: BytesMut::with_capacity(1_024), // pre-allocate 1KiB
+            eof: None,
+        }
+    }
+
+    #[inline]
+    async fn read_until_body(&mut self) -> Result<(), Error> {
+        while self.eof.is_none() {
+            match self.next().await {
+                Some(item) => item?,
+                None => return Err(Error::UnexpectedEnd),
+            };
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn into_body(self) -> BodyStream<Self> {
+        BodyStream::new(self)
+    }
+
+    /// Convert Stream Buffer into HttpResponse
+    ///
+    /// Internally writes stream stdout to temporary memory-buffer
+    /// until all headers can be read, then passes the rest of the stream
+    /// body directly until final EOF is reached.
+    pub async fn into_response(mut self) -> Result<HttpResponse, Error> {
+        self.read_until_body().await?;
+
+        let raw_headers = self.buf.split_to(self.eof.expect("missing eof") + 4);
+        let mut headers = [httparse::EMPTY_HEADER; 32];
+        httparse::parse_headers(raw_headers.trim_ascii(), &mut headers)
+            .map_err(Error::InvalidHeaders)?;
+
+        let mut builder = HttpResponse::Ok();
+        for header in headers.into_iter().filter(|h| !h.name.is_empty()) {
+            match header.name {
+                STATUS_HEADER => builder.status(StatusCode::from_bytes(header.value)?),
+                name => builder.append_header((name, header.value)),
+            };
+        }
+
+        Ok(builder.body(self.into_body()))
+    }
+}
+
+impl Stream for StreamBuf {
+    type Item = Result<Bytes, PayloadError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if !self.buf.is_empty() {
+            let idx = self.buf.len();
+            return Poll::Ready(Some(Ok(self.buf.split_to(idx).freeze())));
+        }
+        match Pin::new(&mut self.stream).poll_next(cx) {
+            Poll::Ready(Some(Ok(content))) => match content {
+                Content::Stdout(data) => {
+                    if self.eof.is_none() {
+                        self.buf.extend_from_slice(&data);
+                        self.eof = data.windows(4).position(|w| w == b"\r\n\r\n");
+                    }
+                    Poll::Ready(Some(Ok(data)))
+                }
+                Content::Stderr(data) => {
+                    let message = std::str::from_utf8(&data);
+                    tracing::warn!(?message, "FastCGI Stderr");
+                    Poll::Ready(Some(Ok(Bytes::new())))
+                }
+            },
+            Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(PayloadError::Io(
+                io::Error::other(err.to_string()),
+            )))),
+            Poll::Ready(None) => {
+                self.eof = Some(self.buf.len());
+                Poll::Ready(None)
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
