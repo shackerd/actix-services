@@ -6,6 +6,6 @@ mod stream;
 
 pub use error::Error;
 pub use factory::FastCGI;
-pub use payload::StreamBuf;
+pub use payload::{RequestStream, ResponseStream};
 pub use service::FastCGIService;
 pub use stream::SockStream;

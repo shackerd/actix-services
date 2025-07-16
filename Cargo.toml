@@ -15,4 +15,10 @@ http = "0.2.7"
 httparse = "1.10.1"
 pin-project = "1.1.10"
 tokio = { version = "1.46.1", default-features = false }
+tokio-util = { version = "0.7.15", features = ["io"] }
 tracing = "0.1.41"
+
+[dev-dependencies]
+actix-web = { version = "4.11.0", default-features = false, features = ['macros'] }
+tokio-fastcgi = "1.2.0"
+tracing-subscriber = "0.3.19"

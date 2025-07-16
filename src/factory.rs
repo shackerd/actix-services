@@ -48,10 +48,18 @@ impl FastCGI {
     /// fastcgi service.
     ///
     pub fn new<P: Into<PathBuf>>(mount_path: &str, root: P, fastcgi_address: &str) -> Self {
+        let root_new = root.into();
+        let root = match root_new.canonicalize() {
+            Ok(root) => root,
+            Err(_) => {
+                tracing::error!("Specified root is not a directory: {root_new:?}");
+                PathBuf::new()
+            }
+        };
         Self {
             mount_path: mount_path.to_owned(),
             guards: Vec::new(),
-            root: root.into(),
+            root,
             fastcgi_address: fastcgi_address.to_owned(),
             server_address: None,
         }

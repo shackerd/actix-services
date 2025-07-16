@@ -7,8 +7,9 @@ use std::{
 };
 
 use actix_web::{
-    HttpResponse,
+    HttpMessage, HttpResponse,
     body::BodyStream,
+    dev::ServiceRequest,
     error::PayloadError,
     http::StatusCode,
     web::{Bytes, BytesMut},
@@ -16,21 +17,60 @@ use actix_web::{
 use fastcgi_client::{ClientError, response::Content};
 use futures_core::{Stream, stream::LocalBoxStream};
 use futures_util::StreamExt;
+use tokio_util::io::StreamReader;
 
 use super::error::Error;
 
 const STATUS_HEADER: &str = "Status";
 
-/// Stream buffer for converting
+/// Request Stream wrapper for converting
+/// [`ServiceRequest`](actix_web::dev::ServiceRequest) into
+/// [`StreamReader`](tokio_util::io::StreamReader)
+pub struct RequestStream(LocalBoxStream<'static, Result<Bytes, PayloadError>>);
+
+impl RequestStream {
+    pub fn new<S>(stream: S) -> Self
+    where
+        S: Stream<Item = Result<Bytes, PayloadError>> + 'static,
+    {
+        Self(Box::pin(stream))
+    }
+    #[inline]
+    pub fn from_request(req: &mut ServiceRequest) -> Self {
+        Self::new(req.take_payload())
+    }
+    #[inline]
+    pub fn into_reader(self) -> StreamReader<Self, Bytes> {
+        StreamReader::new(self)
+    }
+}
+
+impl Stream for RequestStream {
+    type Item = Result<Bytes, std::io::Error>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.0).poll_next(cx) {
+            Poll::Ready(Some(Ok(data))) => {
+                tracing::info!("data! {data:?}");
+                Poll::Ready(Some(Ok(data)))
+            }
+            Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(io::Error::other(err)))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+/// Response Stream buffer for converting
 /// [`StreamResponse`](fastcgi_client::response::ResponseStream) into
 /// [`HttpResponse`](actix_web::HttpResponse)
-pub struct StreamBuf {
+pub struct ResponseStream {
     stream: LocalBoxStream<'static, Result<Content, ClientError>>,
     buf: BytesMut,
     eof: Option<usize>,
 }
 
-impl StreamBuf {
+impl ResponseStream {
     pub fn new<S>(stream: S) -> Self
     where
         S: Stream<Item = Result<Content, ClientError>> + 'static,
@@ -68,13 +108,16 @@ impl StreamBuf {
 
         let raw_headers = self.buf.split_to(self.eof.expect("missing eof") + 4);
         let mut headers = [httparse::EMPTY_HEADER; 32];
-        httparse::parse_headers(raw_headers.trim_ascii(), &mut headers)
+        httparse::parse_headers(&raw_headers[..raw_headers.len() - 2], &mut headers)
             .map_err(Error::InvalidHeaders)?;
 
         let mut builder = HttpResponse::Ok();
         for header in headers.into_iter().filter(|h| !h.name.is_empty()) {
             match header.name {
-                STATUS_HEADER => builder.status(StatusCode::from_bytes(header.value)?),
+                STATUS_HEADER => {
+                    let mut split = header.value.split(|b| b.is_ascii_whitespace());
+                    builder.status(StatusCode::from_bytes(split.next().unwrap_or(b""))?)
+                }
                 name => builder.append_header((name, header.value)),
             };
         }
@@ -83,7 +126,7 @@ impl StreamBuf {
     }
 }
 
-impl Stream for StreamBuf {
+impl Stream for ResponseStream {
     type Item = Result<Bytes, PayloadError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
