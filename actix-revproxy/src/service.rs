@@ -4,11 +4,19 @@ use actix_web::{
     HttpMessage, HttpResponseBuilder,
     body::BoxBody,
     dev::{self, Service, ServiceRequest, ServiceResponse},
-    error::Error,
-    guard::Guard,
+    error::Error as ActixError,
+};
+use awc::{
+    Client,
+    http::{Uri, header::HeaderName},
 };
 use futures_core::future::LocalBoxFuture;
 
+use crate::error::Error;
+
+use super::proxy::*;
+
+/// Assembled reverse-proxy service
 #[derive(Clone)]
 pub struct ProxyService(pub(crate) Rc<ProxyServiceInner>);
 
@@ -21,66 +29,66 @@ impl Deref for ProxyService {
 }
 
 pub struct ProxyServiceInner {
-    pub(crate) guards: Vec<Rc<dyn Guard>>,
-    pub(crate) client: Rc<awc::Client>,
-    pub(crate) resolve: awc::http::Uri,
+    pub(crate) client: Rc<Client>,
+    pub(crate) resolve: Uri,
+    pub(crate) forward: Option<HeaderName>,
 }
 
 impl Service<ServiceRequest> for ProxyService {
     type Response = ServiceResponse<BoxBody>;
-    type Error = Error;
+    type Error = ActixError;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     dev::always_ready!();
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        // skip processing if locations/guards do not match
-        let ctx = req.guard_ctx();
-        let url_path = check_locations!(req, &ctx, self.locations);
-        check_guards!(req, &ctx, self.guards);
-
         let this = self.clone();
         Box::pin(async move {
             let (http_req, payload) = req.into_parts();
 
-            // combine resolution uri with request-uri
-            let uri = match combine_uri(&this.resolve, &url_path, http_req.uri()) {
-                Ok(uri) => uri,
-                Err(err) => {
-                    log::error!("request error: {err:?}");
-                    let req = ServiceRequest::from_parts(http_req, dev::Payload::None);
-                    return Ok(default_response(req));
-                }
-            };
+            let addr = http_req
+                .peer_addr()
+                .map(|addr| addr.ip().to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned());
+            tracing::debug!("{addr} {:?}", http_req.uri());
 
-            // build forwarded-request and send, then retrieve response
-            let mut forward_res = match this
+            let uri = combine_uri(&this.resolve, http_req.uri())?;
+            let mut request = this
                 .client
                 .request(http_req.method().clone(), uri)
-                .no_decompress()
+                .no_decompress();
+
+            for header in http_req.headers() {
+                request = request.append_header(header);
+            }
+            remove_connection_headers(request.headers_mut())?;
+            remove_hop_headers(request.headers_mut());
+
+            if let Some(forward) = this.forward.as_ref() {
+                if !addr.is_empty() {
+                    update_forwarded(request.headers_mut(), forward.clone(), addr.clone())?;
+                }
+            }
+
+            tracing::trace!(?addr, ?request);
+            let mut response = request
                 .send_stream(payload)
                 .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    log::error!("request error: {err:?}");
-                    let req = ServiceRequest::from_parts(http_req, dev::Payload::None);
-                    return Ok(default_response(req));
-                }
-            };
+                .map_err(|err| Error::FailedRequest(err))?;
+            tracing::trace!(?addr, ?response);
 
-            // wrap response payload into body-stream
-            let payload = forward_res.take_payload();
+            let payload = response.take_payload();
             let body = actix_web::body::BodyStream::new(payload);
 
-            // transfer client response details to web-service http-response
-            let mut builder = HttpResponseBuilder::new(forward_res.status());
-            for header in forward_res.headers() {
+            let mut builder = HttpResponseBuilder::new(response.status());
+            for header in response.headers() {
                 builder.append_header(header);
             }
 
-            // build final response and send
-            let http_res = builder.body(body);
+            let mut http_res = builder.body(body);
+            remove_connection_headers(http_res.headers_mut())?;
+            remove_hop_headers(http_res.headers_mut());
+
             Ok(ServiceResponse::new(http_req, http_res))
         })
     }

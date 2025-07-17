@@ -3,4 +3,22 @@ name = "actix-revproxy"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default     = []
+rustls-0_23 = [ 'awc/rustls-0_23', 'awc/rustls-0_23-webpki-roots']
+
 [dependencies]
+actix-files = { git = "https://github.com/imgurbot12/actix-web.git", branch = "feat/pathbuf", version = "0.6.6" }
+actix-service = "2.0.3"
+actix-web = { version = "4.11.0", default-features = false }
+awc = "3.7.0"
+derive_more = { version = "2.0.1", features = ["display"] }
+futures-core = { version = "0.3.31", default-features = false }
+serde_urlencoded = "0.7.1"
+tracing = "0.1.41"
+
+[dev-dependencies]
+actix-web = { version = "4.11.0", default-features = false, features = ["macros"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tracing-subscriber = "0.3.19"
