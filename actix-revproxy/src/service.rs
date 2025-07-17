@@ -48,7 +48,7 @@ impl Service<ServiceRequest> for ProxyService {
 
             let addr = http_req
                 .peer_addr()
-                .map(|addr| addr.ip().to_string())
+                .map(|addr| addr.to_string())
                 .unwrap_or_else(|| "<unknown>".to_owned());
             tracing::debug!("{addr} {:?}", http_req.uri());
 
@@ -65,8 +65,9 @@ impl Service<ServiceRequest> for ProxyService {
             remove_hop_headers(request.headers_mut());
 
             if let Some(forward) = this.forward.as_ref() {
-                if !addr.is_empty() {
-                    update_forwarded(request.headers_mut(), forward.clone(), addr.clone())?;
+                if let Some(addr) = http_req.peer_addr() {
+                    let ip = addr.ip().to_string();
+                    update_forwarded(request.headers_mut(), forward.clone(), ip)?;
                 }
             }
 
