@@ -111,6 +111,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-modsecurity"
+version = "0.1.0"
+dependencies = [
+ "actix-http",
+ "actix-service",
+ "actix-web",
+ "derive_more",
+ "futures-core",
+ "modsecurity",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "actix-revproxy"
 version = "0.1.0"
 dependencies = [
@@ -955,6 +969,25 @@ dependencies = [
  "log",
  "wasi 0.11.1+wasi-snapshot-preview1",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "modsecurity"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08413b14562368af2f733a9ae396b2673b185a744329b9fed0de7c447d99bfb1"
+dependencies = [
+ "lazy_static",
+ "modsecurity-sys",
+]
+
+[[package]]
+name = "modsecurity-sys"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5702ca55e043857447373eb4e9f18078c0a676c1951a43f431502d1e3bab4ffb"
+dependencies = [
+ "pkg-config",
 ]
 
 [[package]]
