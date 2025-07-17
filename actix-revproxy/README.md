@@ -25,7 +25,7 @@ use actix_web::App;
 use actix_fastcgi::RevProxy;
 
 let app = App::new()
-  .service(FastCGI::new("/", "http://example.com"));
+  .service(RevProxy::new("/", "http://example.com"));
 ```
 
 <!-- cargo-rdme end -->
