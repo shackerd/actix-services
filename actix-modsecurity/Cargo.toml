@@ -1,6 +1,6 @@
 [package]
 name = "actix-modsecurity"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 authors = [
   "Andrew Scott <imgurbot12@gmail.com>"
@@ -10,7 +10,7 @@ license = "MIT"
 keywords = ["actix-web", "modsecurity", "security", "middleware"]
 description = "ModSecurity middleware service and library for Actix Web"
 
-respository = "https://github.com/imgurbot12/actix-services/tree/master/actix-modsecurity"
+repository = "https://github.com/imgurbot12/actix-services/tree/master/actix-modsecurity"
 documentation = "https://docs.rs/actix-modsecurity/"
 
 [dependencies]

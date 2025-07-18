@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "actix-modsecurity"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "actix-http",
  "actix-service",

@@ -3,11 +3,11 @@
 <!-- prettier-ignore-start -->
 
 [![crates.io](https://img.shields.io/crates/v/actix-modsecurity?label=latest)](https://crates.io/crates/actix-modsecurity)
-[![Documentation](https://docs.rs/actix-modsecurity/badge.svg?version=0.1.0)](https://docs.rs/actix-modsecurity/0.1.0)
+[![Documentation](https://docs.rs/actix-modsecurity/badge.svg?version=0.1.2)](https://docs.rs/actix-modsecurity/0.1.2)
 ![Version](https://img.shields.io/badge/rustc-1.72+-ab6000.svg)
 ![License](https://img.shields.io/crates/l/actix-modsecurity.svg)
 <br />
-[![dependency status](https://deps.rs/crate/actix-modsecurity/0.1.0/status.svg)](https://deps.rs/crate/actix-modsecurity/0.1.0)
+[![dependency status](https://deps.rs/crate/actix-modsecurity/0.1.2/status.svg)](https://deps.rs/crate/actix-modsecurity/0.1.2)
 [![Download](https://img.shields.io/crates/d/actix-modsecurity.svg)](https://crates.io/crates/actix-modsecurity)
 
 <!-- prettier-ignore-end -->
