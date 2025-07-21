@@ -31,6 +31,7 @@ mod factory;
 mod modsecurity;
 mod service;
 
+pub use error::Error;
 pub use factory::Middleware;
 pub use modsecurity::{Intervention, ModSecurity, Transaction};
 pub use service::ModSecurityService;
