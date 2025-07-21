@@ -22,6 +22,9 @@ pub enum Error {
     #[display("Rewrite query join failed to parse query")]
     InvalidQuery(actix_web::error::QueryPayloadError),
 
+    #[display("Failed to decode rewritten url")]
+    UrlDecodeError(#[error(not(source))] String),
+
     #[display("Failed to re-encode query-string")]
     QueryEncodeError(serde_urlencoded::ser::Error),
 

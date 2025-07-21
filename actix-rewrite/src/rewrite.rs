@@ -1,6 +1,6 @@
 //! Utilities for Actix-Web Rewrite Actions
 
-use actix_http::StatusCode;
+use actix_http::{StatusCode, Uri};
 use actix_web::http::header;
 use actix_web::{HttpRequest, HttpResponse};
 use mod_rewrite::context::{EngineCtx, ServerCtx};
@@ -12,7 +12,7 @@ use super::util;
 
 /// Actix-Web compatible wrapper on [`Rewrite`](mod_rewrite::Rewrite)
 pub enum Rewrite {
-    Uri(String),
+    Uri(Uri),
     Redirect(HttpResponse),
     Response(HttpResponse),
 }
@@ -70,8 +70,8 @@ impl Engine {
             .with_ctx(self.srv_ctx.clone());
         Ok(
             match self.engine.rewrite_ctx(req.uri().to_string(), &mut ctx)? {
-                mod_rewrite::Rewrite::Uri(uri) => Rewrite::Uri(uri),
-                mod_rewrite::Rewrite::EndUri(uri) => Rewrite::Uri(uri),
+                mod_rewrite::Rewrite::Uri(uri) => Rewrite::Uri(util::recode(uri)?),
+                mod_rewrite::Rewrite::EndUri(uri) => Rewrite::Uri(util::recode(uri)?),
                 mod_rewrite::Rewrite::Redirect(uri, sc) => Rewrite::Redirect(
                     HttpResponse::build(StatusCode::from_u16(sc)?)
                         .insert_header((header::LOCATION, uri))

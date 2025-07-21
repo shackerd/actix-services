@@ -1,14 +1,19 @@
 //! Utiliies Used for Actix ModRewrite
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use actix_http::{Uri, uri::Scheme};
+use actix_http::Uri;
 use actix_web::{HttpRequest, web::Query};
 use mod_rewrite::context::RequestCtx;
 
 use super::error::Error;
 
 type QueryMap = Query<HashMap<String, String>>;
+
+#[inline]
+pub(crate) fn recode(uri: String) -> Result<Uri, Error> {
+    Ok(Uri::from_str(&uri)?)
+}
 
 /// Build [`mod_rewrite::context::RequestCtx`]
 /// using [`ServiceRequest`](actix_web::dev::ServiceRequest) data.
@@ -35,17 +40,18 @@ pub fn join_uri(before: &Uri, after: &Uri) -> Result<Uri, Error> {
     query.extend(get_query(after)?.into_inner());
     let query = serde_urlencoded::to_string(query.into_inner())?;
 
-    let mut builder = Uri::builder().scheme(
-        after
-            .scheme()
-            .or(before.scheme())
-            .cloned()
-            .unwrap_or(Scheme::HTTP),
-    );
-
-    if let Some(authority) = after.authority().or(before.authority()) {
-        builder = builder.authority(authority.clone());
-    }
+    let scheme = after
+        .scheme()
+        .or(before.scheme())
+        .map(|scheme| format!("{}://", scheme.as_str()))
+        .unwrap_or_default();
+    let authority = after
+        .authority()
+        .or(before.authority())
+        .map(|authority| authority.as_str())
+        .unwrap_or_default();
     let path = after.path();
-    Ok(builder.path_and_query(format!("{path}?{query}")).build()?)
+
+    let uri = &format!("{scheme}{authority}{path}?{query}");
+    Ok(Uri::from_str(&uri)?)
 }

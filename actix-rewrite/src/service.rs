@@ -1,14 +1,12 @@
-use std::{ops::Deref, rc::Rc, str::FromStr};
+use std::{ops::Deref, rc::Rc};
 
-use actix_http::Uri;
 use actix_web::{
     body::BoxBody,
-    dev::{Service, ServiceRequest, ServiceResponse, forward_ready},
+    dev::{Path, Service, ServiceRequest, ServiceResponse, Url, forward_ready},
     error::Error as ActixError,
 };
 use futures_core::future::LocalBoxFuture;
 
-use super::error::Error;
 use super::rewrite::{Engine, Rewrite};
 use super::util;
 
@@ -43,14 +41,15 @@ where
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let this = Rc::clone(&self.0);
         Box::pin(async move {
-            let uri = match this.engine.rewrite(req.request())? {
+            let after = match this.engine.rewrite(req.request())? {
                 Rewrite::Uri(uri) => uri,
                 Rewrite::Redirect(res) => return Ok(req.into_response(res)),
                 Rewrite::Response(res) => return Ok(req.into_response(res)),
             };
 
-            let after = Uri::from_str(&uri).map_err(Error::InvalidUri)?;
-            req.head_mut().uri = util::join_uri(req.uri(), &after)?;
+            let uri = util::join_uri(req.uri(), &after)?;
+            req.head_mut().uri = uri.clone();
+            *req.match_info_mut() = Path::new(Url::new(uri));
 
             this.service.call(req).await
         })
