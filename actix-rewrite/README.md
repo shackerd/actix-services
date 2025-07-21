@@ -14,7 +14,9 @@
 
 <!-- cargo-rdme start -->
 
-`mod_rewrite` middleware service for Actix Web.
+Dynamic routing rewrite library inspired by apache
+[`mod_rewrite`](https://httpd.apache.org/docs/current/mod/mod_rewrite.html)
+for Actix-Web.
 
 Provides a non-blocking middleware for dynamic rerouting using a complete
 rule based engine.

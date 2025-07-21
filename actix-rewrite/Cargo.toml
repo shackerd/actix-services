@@ -2,6 +2,16 @@
 name = "actix-rewrite"
 version = "0.1.0"
 edition = "2024"
+authors = [
+  "Andrew Scott <imgurbot12@gmail.com>"
+]
+
+license = "MIT"
+keywords = ["actix-web", "mod_rewrite", "rewrite", "routing", "middleware"]
+description = "Dynamic routing rewrite library inspired by Apache mod_rewrite for Actix-Web"
+
+repository = "https://github.com/imgurbot12/actix-services/tree/master/actix-rewrite"
+documentation = "https://docs.rs/actix-rewrite/"
 
 [dependencies]
 actix-http = "3.11.0"
@@ -9,6 +19,6 @@ actix-service = "2.0.3"
 actix-web = { version = "4.11.0", default-features = false }
 derive_more = { version = "2.0.1", features = ["display"] }
 futures-core = { version = "0.3.31", default-features = false }
-mod_rewrite = { version = "0.1.0", path = "../../mod_rewrite" }
+mod_rewrite = "0.1.1"
 regex = "1.11.1"
 serde_urlencoded = "0.7.1"
