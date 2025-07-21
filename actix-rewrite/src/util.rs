@@ -10,7 +10,7 @@ use super::error::Error;
 
 type QueryMap = Query<HashMap<String, String>>;
 
-/// Build [`RequestCtx`](mod_rewrite::context::RequestCtx)
+/// Build [`mod_rewrite::context::RequestCtx`]
 /// using [`ServiceRequest`](actix_web::dev::ServiceRequest) data.
 pub fn request_ctx(req: &HttpRequest) -> RequestCtx {
     RequestCtx::default()
@@ -27,8 +27,8 @@ fn get_query(uri: &Uri) -> Result<QueryMap, Error> {
     Ok(QueryMap::from_query(uri.query().unwrap_or(""))?)
 }
 
-/// Build new URI combining data from [`HttpRequest`](actix_web::HttpRequest)
-/// and rewritten uri from [`Rewrite::try_rewrite`]
+/// Build new URI combining data from [`actix_web::HttpRequest`]
+/// and rewritten uri from [`Engine::rewrite`](crate::Engine::rewrite)
 #[inline]
 pub fn join_uri(before: &Uri, after: &Uri) -> Result<Uri, Error> {
     let mut query = get_query(before)?;
