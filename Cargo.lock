@@ -3,6 +3,15 @@
 version = 4
 
 [[package]]
+name = "actix-chain"
+version = "0.1.0"
+dependencies = [
+ "actix-service",
+ "actix-web",
+ "futures-core",
+]
+
+[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

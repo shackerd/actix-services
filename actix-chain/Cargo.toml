@@ -1,0 +1,12 @@
+[package]
+name = "actix-chain"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-service = "2.0.3"
+actix-web = { version = "4.11.0", default-features = false }
+futures-core = { version = "0.3.31", default-features = false }
+
+[dev-dependencies]
+actix-web = { version = "4.11.0", default-features = false, features = ["macros"] }
