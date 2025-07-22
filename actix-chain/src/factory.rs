@@ -35,7 +35,7 @@ use super::service::{ChainInner, ChainService};
 /// }
 ///
 /// async fn default() -> &'static str {
-///     "Hello world!"
+///     "First link failed!"
 /// }
 ///
 /// App::new().service(
@@ -53,6 +53,10 @@ pub struct Chain {
 }
 
 impl Chain {
+    /// Creates new `Chain` instance.
+    ///
+    /// The first argument (`mount_path`) is the root URL at which the static files are served.
+    /// For example, `/assets` will serve files at `example.com/assets/...`.
     pub fn new(mount_path: &str) -> Self {
         Self {
             mount_path: mount_path.to_owned(),
@@ -84,15 +88,18 @@ impl Chain {
         self
     }
 
+    /// Add a new [`Link`] to the established chain.
     #[inline]
     pub fn link(mut self, link: Link) -> Self {
-        self.add_link(link);
+        self.push_link(link);
         self
     }
 
+    /// Append a [`Link`] via mutable reference for dynamic assignment.
     #[inline]
-    pub fn add_link(&mut self, link: Link) {
+    pub fn push_link(&mut self, link: Link) -> &mut Self {
         self.links.push(link);
+        self
     }
 }
 

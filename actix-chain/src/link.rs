@@ -18,6 +18,22 @@ use crate::{
 ///
 /// Wraps an Actix-Web service factory with details on when the service should
 /// be evaluated in the chain and if processing should continue afterwards.
+///
+/// # Examples
+///
+/// ```
+/// use actix_web::{App, guard::Header, http::StatusCode, web};
+/// use actix_chain::{Chain, Link, next::IsStatus};
+///
+/// async fn index() -> &'static str {
+///     "Hello World!"
+/// }
+///
+/// Link::new(web::get().to(index))
+///     .prefix("/index")
+///     .guard(Header("Host", "example.com"))
+///     .next(IsStatus(StatusCode::NOT_FOUND));
+/// ```
 #[derive(Clone)]
 pub struct Link {
     prefix: String,
@@ -27,7 +43,9 @@ pub struct Link {
 }
 
 impl Link {
-    /// Create a new [`Link`] for your [`Chain`](crate::Chain)
+    /// Create a new [`Link`] for your [`Chain`](crate::Chain).
+    ///
+    /// Any Actix-Web service can be passed such as [`actix_web::Route`].
     pub fn new<F, U>(service: F) -> Self
     where
         F: IntoServiceFactory<U, ServiceRequest>,
@@ -56,9 +74,9 @@ impl Link {
     /// Use this to allow multiple chained services that respond to strictly different
     /// properties of a request.
     ///
-    /// **NOTE** If a guard supplied here does not match a given request, the
-    /// request WILL be forwarded to the next [`Link`] in the chain, unlike
-    ///  [`Chain::guard`](crate::Guard))
+    /// **IMPORTANT:** If a guard supplied here does not match a given request,
+    /// the request WILL be forwarded to the next [`Link`] in the chain, unlike
+    /// [`Chain::guard`](crate::Chain::guard)
     ///
     /// # Examples
     /// ```

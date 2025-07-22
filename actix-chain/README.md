@@ -32,7 +32,7 @@ async fn might_fail(req: HttpRequest) -> impl Responder {
 }
 
 async fn default() -> &'static str {
-  "Hello world!"
+  "First link failed!"
 }
 
 App::new().service(

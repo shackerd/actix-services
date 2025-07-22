@@ -1,3 +1,5 @@
+//! All tools and utilities related to [`Link::next`](crate::Link::next)
+
 use actix_web::{
     HttpResponse,
     http::{StatusCode, header::HeaderName},
@@ -12,7 +14,7 @@ pub trait Next {
     fn next(&self, res: &HttpResponse) -> bool;
 }
 
-/// Simple [`StatusCode`](actix_web::http::StatusCode) response guard.
+/// Simple [`StatusCode`] response guard.
 ///
 /// Blocks the response the specified status-code is present.
 pub struct IsStatus(pub StatusCode);
@@ -37,7 +39,7 @@ impl Next for IsStatus {
     }
 }
 
-/// Simple [`HeaderName`](actix_web::http::header::HeaderName)
+/// Simple [`HeaderName`]
 /// response guard.
 ///
 /// Blocks the response if the specified header is present.

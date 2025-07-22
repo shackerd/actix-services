@@ -15,6 +15,7 @@ use crate::payload::PayloadRef;
 pub type HttpService = BoxService<ServiceRequest, ServiceResponse, Error>;
 pub type HttpNewService = BoxServiceFactory<(), ServiceRequest, ServiceResponse, Error, ()>;
 
+/// Assembled chain service.
 #[derive(Clone)]
 pub struct ChainService(pub(crate) Rc<ChainInner>);
 
