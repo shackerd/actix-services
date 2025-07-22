@@ -143,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "actix-rewrite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "actix-http",
  "actix-service",
@@ -1073,9 +1073,9 @@ dependencies = [
 
 [[package]]
 name = "mod_rewrite"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d0a18b4eb97a0c4c6b7d10945ed371a2da62d9e5d338b7f538d80cc07780766"
+checksum = "9a70fd83e41a14a853e9d03cc9a565d6e9fab4178a887ab0865c2dcf7a4c8bea"
 dependencies = [
  "chrono",
  "once_cell",

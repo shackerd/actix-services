@@ -69,7 +69,7 @@ impl Engine {
             .with_ctx(util::request_ctx(req))
             .with_ctx(self.srv_ctx.clone());
         Ok(
-            match self.engine.rewrite_ctx(req.uri().to_string(), &mut ctx)? {
+            match self.engine.rewrite_ctx(&req.uri().to_string(), &mut ctx)? {
                 mod_rewrite::Rewrite::Uri(uri) => Rewrite::Uri(util::recode(uri)?),
                 mod_rewrite::Rewrite::EndUri(uri) => Rewrite::Uri(util::recode(uri)?),
                 mod_rewrite::Rewrite::Redirect(uri, sc) => Rewrite::Redirect(
