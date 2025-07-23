@@ -187,7 +187,7 @@ impl LinkInner {
     /// Check if request path matches prefix and any guards are met
     #[inline]
     pub(crate) fn matches(&self, path: &str, ctx: &GuardContext) -> bool {
-        path.starts_with(&self.prefix) && self.guard.as_ref().is_some_and(|g| !g.check(ctx))
+        path.starts_with(&self.prefix) && self.guard.as_ref().map(|g| !g.check(ctx)).unwrap_or(true)
     }
 
     /// Check if response is invalid, and next link should execute

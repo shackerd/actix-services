@@ -9,6 +9,8 @@ dependencies = [
  "actix-service",
  "actix-web",
  "futures-core",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

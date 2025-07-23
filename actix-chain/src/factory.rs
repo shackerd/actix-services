@@ -153,7 +153,7 @@ impl ServiceFactory<ServiceRequest> for Chain {
                 }
             }
             Ok(ChainService(Rc::new(ChainInner {
-                links: vec![],
+                links,
                 body_buffer_size: this.body_buffer_size,
             })))
         })
