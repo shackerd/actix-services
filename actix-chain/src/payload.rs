@@ -79,6 +79,7 @@ impl PayloadBuffer {
         self.cursor = 0;
     }
 
+    #[inline]
     fn read_buffered(&mut self) -> Option<Bytes> {
         if self.cursor < self.buf.len() {
             let data = self
