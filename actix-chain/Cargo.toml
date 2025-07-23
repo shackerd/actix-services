@@ -2,6 +2,16 @@
 name = "actix-chain"
 version = "0.1.0"
 edition = "2024"
+authors = [
+  "Andrew Scott <imgurbot12@gmail.com>"
+]
+
+license = "MIT"
+keywords = ["actix-web", "service", "chain", "routing", "middleware"]
+description = "Actix-Web service chaining service."
+
+repository = "https://github.com/imgurbot12/actix-services/tree/master/actix-chain"
+documentation = "https://docs.rs/actix-chain/"
 
 [dependencies]
 actix-service = "2.0.3"
