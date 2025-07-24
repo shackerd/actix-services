@@ -18,7 +18,6 @@ pub type Addr = (String, u16);
 struct TransactionConfig {
     max_request_body: Option<usize>,
     max_response_body: Option<usize>,
-    server_address: Option<Addr>,
 }
 
 /// Actix-Web compatible wrapper on [`ModSecurity`](modsecurity::ModSecurity)
@@ -92,15 +91,6 @@ impl ModSecurity {
     /// overloading your web-service.
     pub fn set_max_response_size(&mut self, max_response_body: Option<usize>) -> &mut Self {
         self.config.max_response_body = max_response_body;
-        self
-    }
-
-    /// Include server bindings information to include in transaction processing.
-    ///
-    /// Allows [`Transaction::process_connection`](crate::Transaction::process_connection)
-    /// to work as intended rather than skip over connection information.
-    pub fn set_server_address(&mut self, server_address: Option<Addr>) -> &mut Self {
-        self.config.server_address = server_address;
         self
     }
 
@@ -187,15 +177,13 @@ impl<'a> Transaction<'a> {
             tracing::warn!("missing client-address. cannot scan connection");
             return Ok(());
         };
-        let Some(saddr) = self.config.server_address.as_ref() else {
-            tracing::warn!("missing server-address. cannot scan connection");
-            return Ok(());
-        };
+
+        let saddr = req.app_config().local_addr();
         Ok(self.transaction.process_connection(
             &caddr.ip().to_string(),
             caddr.port() as i32,
-            &saddr.0,
-            saddr.1 as i32,
+            &saddr.ip().to_string(),
+            saddr.port() as i32,
         )?)
     }
 

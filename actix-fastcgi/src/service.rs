@@ -34,6 +34,7 @@ impl FastCGIService {
     ///
     /// The third argument (`req`) is the http-request object to load data from
     pub fn fill_params<'a>(&'a self, root: &'a Path, path: &Path, req: &HttpRequest) -> Params<'a> {
+        let saddr = req.app_config().local_addr();
         let script_name = format!("/{}", path.to_string_lossy());
         let mut params = Params::default()
             .document_uri(script_name.clone())
@@ -42,7 +43,9 @@ impl FastCGIService {
             .request_uri(req.uri().path().to_owned())
             .script_name(script_name)
             .script_filename(root.to_string_lossy())
-            .server_name(req.connection_info().host().to_owned());
+            .server_name(req.connection_info().host().to_owned())
+            .server_addr(saddr.ip().to_string())
+            .server_port(saddr.port());
 
         for (name, value) in req.headers() {
             let val = match value.to_str() {
@@ -56,9 +59,7 @@ impl FastCGIService {
             };
             params.insert(name.into(), val.to_owned().into());
         }
-        if let Some((host, port)) = self.server_address.as_ref() {
-            params = params.server_addr(host).server_port(*port)
-        }
+
         if let Some(peer) = req.peer_addr() {
             let client = peer.ip().to_string();
             params = params.remote_addr(client).remote_port(peer.port());
@@ -78,7 +79,6 @@ impl Deref for FastCGIService {
 pub struct FastCGIInner {
     pub(crate) root: PathBuf,
     pub(crate) fastcgi_address: String,
-    pub(crate) server_address: Option<Addr>,
 }
 
 impl Service<ServiceRequest> for FastCGIService {

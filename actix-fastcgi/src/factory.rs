@@ -31,7 +31,6 @@ pub struct FastCGI {
     guards: Vec<Rc<dyn Guard>>,
     root: PathBuf,
     fastcgi_address: String,
-    server_address: Option<Addr>,
 }
 
 impl FastCGI {
@@ -61,9 +60,9 @@ impl FastCGI {
             guards: Vec::new(),
             root,
             fastcgi_address: fastcgi_address.to_owned(),
-            server_address: None,
         }
     }
+
     /// Adds a routing guard.
     ///
     /// Use this to allow multiple chained services that respond to strictly different
@@ -83,13 +82,6 @@ impl FastCGI {
     /// ```
     pub fn guard<G: Guard + 'static>(mut self, guards: G) -> Self {
         self.guards.push(Rc::new(guards));
-        self
-    }
-    /// Specifies server address details to pass to fastcgi
-    ///
-    /// Default is None
-    pub fn server_address(mut self, server_address: Option<Addr>) -> Self {
-        self.server_address = server_address;
         self
     }
 }
@@ -130,7 +122,6 @@ impl ServiceFactory<ServiceRequest> for FastCGI {
         let inner = FastCGIInner {
             root: self.root.clone(),
             fastcgi_address: self.fastcgi_address.clone(),
-            server_address: self.server_address.clone(),
         };
         Box::pin(async move { Ok(FastCGIService(Rc::new(inner))) })
     }
