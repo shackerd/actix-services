@@ -1,5 +1,7 @@
 //! All tools and utilities related to [`Link::next`](crate::Link::next)
 
+use std::rc::Rc;
+
 use actix_web::{
     HttpResponse,
     http::{StatusCode, header::HeaderName},
@@ -20,8 +22,13 @@ pub trait Next {
 pub struct IsStatus(pub StatusCode);
 
 impl IsStatus {
+    #[inline]
     pub fn new(status: StatusCode) -> Self {
         Self(status)
+    }
+    #[inline]
+    pub(crate) fn rc(status: StatusCode) -> Rc<Self> {
+        Rc::new(Self::new(status))
     }
 }
 

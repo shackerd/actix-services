@@ -40,11 +40,6 @@ impl Service<ServiceRequest> for ChainService {
     dev::always_ready!();
 
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
-        if self.links.is_empty() {
-            tracing::warn!("no links present in chain!");
-            return Box::pin(async move { Ok(default_response(req)) });
-        }
-
         let this = self.clone();
         if self.links.len() == 1 {
             return Box::pin(async move { this.links[0].call_once(req).await });

@@ -1,14 +1,15 @@
 use std::rc::Rc;
 
-use actix_service::ServiceFactory;
+use actix_service::{ServiceFactory, Transform};
 use actix_web::{
     Error,
+    body::MessageBody,
     dev::{AppService, HttpServiceFactory, ResourceDef, ServiceRequest, ServiceResponse},
     guard::Guard,
 };
 use futures_core::future::LocalBoxFuture;
 
-use crate::link::Link;
+use crate::{link::Link, next::Next, service::HttpService};
 
 use super::service::{ChainInner, ChainService};
 
@@ -46,9 +47,10 @@ use super::service::{ChainInner, ChainService};
 /// ```
 #[derive(Clone)]
 pub struct Chain {
-    mount_path: String,
-    links: Vec<Link>,
-    guards: Vec<Rc<dyn Guard>>,
+    pub(crate) mount_path: String,
+    pub(crate) links: Vec<Link>,
+    pub(crate) guards: Vec<Rc<dyn Guard>>,
+    pub(crate) next: Vec<Rc<dyn Next>>, // For Into<Link> only
     body_buffer_size: usize,
 }
 
@@ -62,6 +64,7 @@ impl Chain {
             mount_path: mount_path.to_owned(),
             links: Vec::new(),
             guards: Vec::new(),
+            next: Vec::new(),
             body_buffer_size: 32 * 1024, // 32 kb default
         }
     }
@@ -88,6 +91,55 @@ impl Chain {
         self
     }
 
+    /// Registers a chain specific middleware.
+    ///
+    /// Wrapping a chain advantagously does not construct an object
+    /// of varying type, meaning you can dynamically chain together
+    /// middleware during chain construction, unlike [`actix_web::App::wrap`].
+    ///
+    /// **IMPORTANT:** Since wrapping a chain immediately constructs
+    /// a new chain object around its existing contents, [`Chain::wrap`]
+    /// should only be called _AFTER_ all links have been added to the
+    /// existing chain, rather than before.
+    ///
+    /// See [`actix_web::middleware`] for more details on middleware.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use actix_web::{middleware, web, App};
+    /// use actix_chain::{Chain, Link};
+    ///
+    /// async fn index() -> &'static str {
+    ///     "Welcome!"
+    /// }
+    ///
+    /// let chain = Chain::default()
+    ///     .link(Link::new(web::get().to(index)).prefix("/index.html"))
+    ///     .wrap(middleware::Logger::default());
+    /// ```
+    #[inline]
+    pub fn wrap<M, B>(mut self, middleware: M) -> Chain
+    where
+        M: Transform<
+                HttpService,
+                ServiceRequest,
+                Response = ServiceResponse<B>,
+                Error = Error,
+                InitError = (),
+            > + 'static,
+        B: MessageBody + 'static,
+    {
+        let prefix = self.mount_path.clone();
+        let guards: Vec<_> = self.guards.drain(0..).collect();
+        let next: Vec<_> = self.next.drain(0..).collect();
+        let link = Link::from(self).wrap(middleware);
+        let mut chain = Chain::new(&prefix).link(link);
+        chain.next = next;
+        chain.guards = guards;
+        chain
+    }
+
     /// Add a new [`Link`] to the established chain.
     #[inline]
     pub fn link(mut self, link: Link) -> Self {
@@ -107,6 +159,19 @@ impl Default for Chain {
     #[inline]
     fn default() -> Self {
         Self::new("")
+    }
+}
+
+impl From<Link> for Chain {
+    /// Convert link into single linked chain.
+    fn from(mut value: Link) -> Self {
+        let prefix = value.prefix.clone();
+        let guards: Vec<_> = value.guards.drain(0..).collect();
+        let next: Vec<_> = value.next.clone();
+        let mut chain = Self::new(&prefix).link(value);
+        chain.guards = guards;
+        chain.next = next;
+        chain
     }
 }
 
@@ -143,6 +208,9 @@ impl ServiceFactory<ServiceRequest> for Chain {
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
+        if self.links.is_empty() {
+            panic!("Chain contains no links!")
+        }
         let this = self.clone();
         Box::pin(async move {
             let mut links = vec![];

@@ -1,15 +1,18 @@
 use std::{rc::Rc, str::FromStr};
 
-use actix_service::{IntoServiceFactory, ServiceFactory, ServiceFactoryExt, boxed};
+use actix_service::{IntoServiceFactory, ServiceFactory, ServiceFactoryExt, Transform, boxed};
 use actix_web::{
     Error, HttpResponse,
+    body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
     guard::{Guard, GuardContext},
     http::{StatusCode, Uri, header, uri::PathAndQuery},
+    middleware::Compat,
     mime,
 };
 
 use crate::{
+    Chain,
     next::{IsStatus, Next},
     service::{HttpNewService, HttpService},
 };
@@ -36,10 +39,20 @@ use crate::{
 /// ```
 #[derive(Clone)]
 pub struct Link {
-    prefix: String,
-    guards: Vec<Rc<dyn Guard>>,
-    next: Vec<Rc<dyn Next>>,
+    pub(crate) prefix: String,
+    pub(crate) guards: Vec<Rc<dyn Guard>>,
+    pub(crate) next: Vec<Rc<dyn Next>>,
     service: Rc<HttpNewService>,
+}
+
+#[inline]
+fn box_factory<F, U>(service: F) -> Rc<HttpNewService>
+where
+    F: IntoServiceFactory<U, ServiceRequest>,
+    U: ServiceFactory<ServiceRequest, Config = (), Response = ServiceResponse, Error = Error>
+        + 'static,
+{
+    Rc::new(boxed::factory(service.into_factory().map_init_err(|_| ())))
 }
 
 impl Link {
@@ -56,7 +69,7 @@ impl Link {
             prefix: String::new(),
             guards: Vec::new(),
             next: Vec::new(),
-            service: Rc::new(boxed::factory(service.into_factory().map_init_err(|_| ()))),
+            service: box_factory(service),
         }
     }
 
@@ -104,7 +117,7 @@ impl Link {
     /// assuming another link exists within the chain.
     ///
     /// The default [`Link`] behavior is to continue down the chain
-    /// on "404 Not Found" responses only.
+    /// on "404 Not Found" and "405 Method Not Allowed" responses only.
     ///
     /// # Examples
     /// ```
@@ -126,6 +139,45 @@ impl Link {
         self
     }
 
+    /// Registers a link specific middleware.
+    ///
+    /// Wrapping a link advantagously does not construct
+    /// an object of varying type, meaning you can dynamically chain
+    /// together middleware during link construction, unlike [`actix_web::App::wrap`]
+    ///
+    /// See [`actix_web::middleware`] for more details on middleware.
+    ///
+    /// # Example
+    ///
+    ///```
+    /// use actix_web::{middleware, web, App};
+    /// use actix_chain::Link;
+    ///
+    /// async fn index() -> &'static str {
+    ///     "Welcome!"
+    /// }
+    ///
+    /// let link = Link::new(web::get().to(index))
+    ///     .wrap(middleware::Logger::default())
+    ///     .prefix("/index.html");
+    ///```
+    #[inline]
+    pub fn wrap<M, B>(mut self, middleware: M) -> Self
+    where
+        M: Transform<
+                HttpService,
+                ServiceRequest,
+                Response = ServiceResponse<B>,
+                Error = Error,
+                InitError = (),
+            > + 'static,
+        B: MessageBody + 'static,
+    {
+        let svc = actix_service::apply(Compat::new(middleware), self.service.clone());
+        self.service = box_factory(svc);
+        self
+    }
+
     /// Convert public [`Link`] builder into [`LinkInner`]
     pub(crate) async fn into_inner(&self) -> Result<LinkInner, ()> {
         let guard = match self.guards.is_empty() {
@@ -133,7 +185,10 @@ impl Link {
             false => Some(AllGuard(self.guards.clone())),
         };
         let next: Vec<Rc<dyn Next>> = match self.next.is_empty() {
-            true => vec![Rc::new(IsStatus::new(StatusCode::NOT_FOUND))],
+            true => vec![
+                IsStatus::rc(StatusCode::NOT_FOUND),
+                IsStatus::rc(StatusCode::METHOD_NOT_ALLOWED),
+            ],
             false => self.next.clone(),
         };
         Ok(LinkInner {
@@ -142,6 +197,18 @@ impl Link {
             prefix: self.prefix.clone(),
             service: Rc::new(self.service.new_service(()).await?),
         })
+    }
+}
+
+impl From<Chain> for Link {
+    fn from(mut value: Chain) -> Self {
+        let prefix = value.mount_path.clone();
+        let guards: Vec<_> = value.guards.drain(0..).collect();
+        let next: Vec<_> = value.next.drain(0..).collect();
+        let mut link = Self::new(value).prefix(&prefix);
+        link.guards = guards;
+        link.next = next;
+        link
     }
 }
 
