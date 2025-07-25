@@ -192,6 +192,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-sanitize"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "futures-core",
+ "tracing",
+]
+
+[[package]]
 name = "actix-server"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

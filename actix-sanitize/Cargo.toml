@@ -1,0 +1,9 @@
+[package]
+name = "actix-sanitize"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = { version = "4.11.0", default-features = false }
+futures-core = { version = "0.3.31", default-features = false }
+tracing = "0.1.41"
