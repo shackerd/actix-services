@@ -16,7 +16,7 @@ pub(crate) fn recode(uri: String) -> Result<Uri, Error> {
 }
 
 /// Build [`mod_rewrite::context::RequestCtx`]
-/// using [`HttpRequest`](actix_web::HttpRequest) data.
+/// using [`HttpRequest`] data.
 pub fn request_ctx(req: &HttpRequest) -> RequestCtx {
     RequestCtx::default()
         .path_info(req.match_info().unprocessed())
@@ -28,7 +28,7 @@ pub fn request_ctx(req: &HttpRequest) -> RequestCtx {
 }
 
 /// Fill [`mod_rewrite::context::ServerCtx`]
-/// using [`HttpRequest`](actix_web::HttpRequest) data.
+/// using [`HttpRequest`] data.
 pub fn fill_server_ctx(ctx: ServerCtx, req: &HttpRequest) -> Result<ServerCtx, Error> {
     Ok(ctx
         .server_addr(req.app_config().local_addr())?
