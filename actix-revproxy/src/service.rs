@@ -50,9 +50,9 @@ impl Service<ServiceRequest> for ProxyService {
                 .peer_addr()
                 .map(|addr| addr.to_string())
                 .unwrap_or_else(|| "<unknown>".to_owned());
-            tracing::debug!("{addr} {:?}", http_req.uri());
 
             let uri = combine_uri(&this.resolve, http_req.uri())?;
+            tracing::debug!("{addr} {:?} {uri:?}", http_req.method());
             let mut request = this
                 .client
                 .request(http_req.method().clone(), uri)
@@ -75,7 +75,7 @@ impl Service<ServiceRequest> for ProxyService {
             let mut response = request
                 .send_stream(payload)
                 .await
-                .map_err(|err| Error::FailedRequest(err))?;
+                .map_err(Error::FailedRequest)?;
             tracing::trace!(?addr, ?response);
 
             let payload = response.take_payload();

@@ -17,9 +17,6 @@ use futures_core::future::LocalBoxFuture;
 use super::payload::{RequestStream, ResponseStream};
 use super::stream::SockStream;
 
-/// Server Address Type Alias
-pub type Addr = (String, u16);
-
 /// Assembled fastcgi client service
 #[derive(Clone)]
 pub struct FastCGIService(pub(crate) Rc<FastCGIInner>);

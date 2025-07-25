@@ -35,13 +35,13 @@ impl PayloadRef {
     }
 
     #[inline]
-    pub fn into_stream(&self) -> LocalBoxStream<'static, Result<Bytes, PayloadError>> {
+    pub fn stream(&self) -> LocalBoxStream<'static, Result<Bytes, PayloadError>> {
         Box::pin(self.clone())
     }
 
-    pub fn into_payload(&self) -> Payload {
+    pub fn payload(&self) -> Payload {
         Payload::Stream {
-            payload: self.into_stream(),
+            payload: self.stream(),
         }
     }
 }

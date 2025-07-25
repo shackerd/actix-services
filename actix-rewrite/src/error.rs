@@ -7,6 +7,9 @@ use derive_more::{Display, Error, From};
 #[derive(Debug, Display, From, Error)]
 #[non_exhaustive]
 pub enum Error {
+    #[display("Internal Io Error")]
+    IoError(std::io::Error),
+
     #[display("Invalid rewrite expression")]
     RuleError(mod_rewrite::error::ExpressionError),
 

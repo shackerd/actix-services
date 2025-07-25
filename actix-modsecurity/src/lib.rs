@@ -26,11 +26,13 @@
 //! # Requirements
 //!
 //! This crate requires `libmodsecurity` >= 3.0.6 to be installed on your system.
+mod builder;
 mod error;
 mod factory;
 mod modsecurity;
 mod service;
 
+pub use builder::Builder;
 pub use error::Error;
 pub use factory::Middleware;
 pub use modsecurity::{Intervention, ModSecurity, Transaction};

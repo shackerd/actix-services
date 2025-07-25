@@ -179,7 +179,7 @@ impl Link {
     }
 
     /// Convert public [`Link`] builder into [`LinkInner`]
-    pub(crate) async fn into_inner(&self) -> Result<LinkInner, ()> {
+    pub(crate) async fn inner(&self) -> Result<LinkInner, ()> {
         let guard = match self.guards.is_empty() {
             true => None,
             false => Some(AllGuard(self.guards.clone())),

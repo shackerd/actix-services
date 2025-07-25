@@ -8,11 +8,9 @@ use actix_web::{
     http::{StatusCode, Version, header},
 };
 
-use crate::{error::Error, factory::Middleware};
+use crate::{builder::Builder, error::Error, factory::Middleware};
 
 const CONNECTION_INFO: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"));
-
-pub type Addr = (String, u16);
 
 #[derive(Clone, Default)]
 struct TransactionConfig {
@@ -44,6 +42,12 @@ impl ModSecurity {
                 .expect("failed to add connector into")
                 .build(),
         }
+    }
+
+    /// Generate [`Builder`] for [`ModSecurity`] instance.
+    #[inline]
+    pub fn builder() -> Builder {
+        Self::new().into()
     }
 
     /// Adds plain rules from string into the set.
@@ -126,10 +130,10 @@ impl ModSecurity {
     }
 }
 
-impl Into<Middleware> for ModSecurity {
+impl Default for ModSecurity {
     #[inline]
-    fn into(self) -> Middleware {
-        Middleware::new(self)
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -156,7 +160,7 @@ fn intervention_response(intv: &modsecurity::Intervention) -> Result<HttpRespons
         return Ok(res.into());
     }
     let code = StatusCode::from_u16(intv.status() as u16)?;
-    return Ok(HttpResponse::new(code));
+    Ok(HttpResponse::new(code))
 }
 
 /// Actix-Web compatible wrapper on [`Tranaction`](modsecurity::Transaction)
@@ -333,13 +337,13 @@ impl Intervention {
     /// Returns the log message, if any, of the intervention.
     #[inline]
     pub fn log(&self) -> Option<&str> {
-        self.message.as_ref().map(|s| s.as_str())
+        self.message.as_deref()
     }
 
     /// Returns the URL, if any, of the intervention.
     #[inline]
     pub fn url(&self) -> Option<&str> {
-        self.url.as_ref().map(|s| s.as_str())
+        self.url.as_deref()
     }
 
     /// Returns the status code of the intervention.
@@ -354,14 +358,14 @@ impl Intervention {
     }
 }
 
-impl Into<HttpResponse> for Intervention {
-    fn into(self) -> HttpResponse {
-        self.response
+impl From<Intervention> for HttpResponse {
+    fn from(value: Intervention) -> Self {
+        value.response
     }
 }
 
-impl Into<Response<BoxBody>> for Intervention {
-    fn into(self) -> Response<BoxBody> {
-        self.response.into()
+impl From<Intervention> for Response<BoxBody> {
+    fn from(value: Intervention) -> Self {
+        value.response.into()
     }
 }

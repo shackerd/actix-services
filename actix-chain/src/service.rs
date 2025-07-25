@@ -48,7 +48,7 @@ impl Service<ServiceRequest> for ChainService {
         Box::pin(async move {
             let payload = req.take_payload();
             let buf = PayloadRef::new(payload, this.body_buffer_size);
-            req.set_payload(buf.into_payload());
+            req.set_payload(buf.payload());
 
             let ctx = req.guard_ctx();
             let active_links: Vec<_> = this
@@ -88,7 +88,7 @@ impl Service<ServiceRequest> for ChainService {
                 }
 
                 buf.get_mut().reset_stream();
-                req = ServiceRequest::from_parts(http_req, buf.into_payload());
+                req = ServiceRequest::from_parts(http_req, buf.payload());
 
                 if let Some(uri) = original_uri {
                     req.head_mut().uri = uri;

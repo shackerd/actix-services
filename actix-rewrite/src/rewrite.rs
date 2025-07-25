@@ -1,5 +1,7 @@
 //! Utilities for Actix-Web Rewrite Actions
 
+use std::path::Path;
+
 use actix_http::{StatusCode, Uri};
 use actix_web::http::header;
 use actix_web::{HttpRequest, HttpResponse};
@@ -60,6 +62,29 @@ impl Engine {
         Ok(self)
     }
 
+    /// Parses additional rewrite expressions from a file to append to the engine.
+    ///
+    /// See [`mod_rewrite::Engine::add_rules`](mod_rewrite::Engine::add_rules)
+    /// for more details.
+    #[inline]
+    pub fn add_rules_file<P: AsRef<Path>>(&mut self, path: P) -> Result<&mut Self, Error> {
+        self.add_rules(&std::fs::read_to_string(path)?)
+    }
+
+    /// Builder method equivalent of [`Engine::add_rules`]
+    #[inline]
+    pub fn rules(mut self, rules: &str) -> Result<Self, Error> {
+        self.add_rules(rules)?;
+        Ok(self)
+    }
+
+    /// Builder method equivalent of [`Engine::add_rules_file`]
+    #[inline]
+    pub fn rules_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self, Error> {
+        self.add_rules_file(path)?;
+        Ok(self)
+    }
+
     /// Evaluates the given [`HttpRequest`](actix_web::HttpRequest) against
     /// the engine rules and returns a [`Rewrite`] response.
     pub fn rewrite(&self, req: &HttpRequest) -> Result<Rewrite, Error> {
@@ -67,7 +92,7 @@ impl Engine {
             .with_env()
             .with_time()
             .with_ctx(util::request_ctx(req))
-            .with_ctx(self.srv_ctx.clone());
+            .with_ctx(util::fill_server_ctx(self.srv_ctx.clone(), req)?);
         Ok(
             match self.engine.rewrite_ctx(&req.uri().to_string(), &mut ctx)? {
                 mod_rewrite::Rewrite::Uri(uri) => Rewrite::Uri(util::recode(uri)?),

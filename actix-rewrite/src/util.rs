@@ -4,7 +4,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use actix_http::Uri;
 use actix_web::{HttpRequest, web::Query};
-use mod_rewrite::context::RequestCtx;
+use mod_rewrite::context::{RequestCtx, ServerCtx};
 
 use super::error::Error;
 
@@ -16,7 +16,7 @@ pub(crate) fn recode(uri: String) -> Result<Uri, Error> {
 }
 
 /// Build [`mod_rewrite::context::RequestCtx`]
-/// using [`ServiceRequest`](actix_web::dev::ServiceRequest) data.
+/// using [`HttpRequest`](actix_web::HttpRequest) data.
 pub fn request_ctx(req: &HttpRequest) -> RequestCtx {
     RequestCtx::default()
         .path_info(req.match_info().unprocessed())
@@ -25,6 +25,18 @@ pub fn request_ctx(req: &HttpRequest) -> RequestCtx {
         .query_string(req.uri().query().unwrap_or(""))
         .maybe_remote_addr(req.peer_addr())
         .expect("invalid peer address")
+}
+
+/// Fill [`mod_rewrite::context::ServerCtx`]
+/// using [`HttpRequest`](actix_web::HttpRequest) data.
+pub fn fill_server_ctx(ctx: ServerCtx, req: &HttpRequest) -> Result<ServerCtx, Error> {
+    Ok(ctx
+        .server_addr(req.app_config().local_addr())?
+        .server_protocol(if req.app_config().secure() {
+            "https"
+        } else {
+            "http"
+        }))
 }
 
 #[inline]
@@ -52,6 +64,6 @@ pub fn join_uri(before: &Uri, after: &Uri) -> Result<Uri, Error> {
         .unwrap_or_default();
     let path = after.path();
 
-    let uri = &format!("{scheme}{authority}{path}?{query}");
+    let uri = format!("{scheme}{authority}{path}?{query}");
     Ok(Uri::from_str(&uri)?)
 }

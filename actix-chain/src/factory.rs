@@ -215,7 +215,7 @@ impl ServiceFactory<ServiceRequest> for Chain {
         Box::pin(async move {
             let mut links = vec![];
             for link in this.links {
-                match link.into_inner().await {
+                match link.inner().await {
                     Ok(link) => links.push(link),
                     Err(_) => return Err(()),
                 }

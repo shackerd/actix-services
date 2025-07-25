@@ -10,7 +10,7 @@ use actix_web::{
 };
 use futures_core::future::LocalBoxFuture;
 
-use super::service::{Addr, FastCGIInner, FastCGIService};
+use super::service::{FastCGIInner, FastCGIService};
 
 /// FastCGI client service
 ///

@@ -8,6 +8,7 @@ use actix_web::{
 };
 
 use crate::ModSecurityService;
+use crate::builder::Builder;
 use crate::modsecurity::ModSecurity;
 use crate::service::ModSecurityInner;
 
@@ -36,6 +37,20 @@ impl Middleware {
     #[inline]
     pub fn new(modsecurity: ModSecurity) -> Self {
         Self(Rc::new(modsecurity))
+    }
+}
+
+impl From<ModSecurity> for Middleware {
+    #[inline]
+    fn from(value: ModSecurity) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<Builder> for Middleware {
+    #[inline]
+    fn from(value: Builder) -> Self {
+        Self::new(value.build())
     }
 }
 
