@@ -55,7 +55,7 @@ impl FastCGIService {
         }
 
         let root = self.root.to_string_lossy().to_string();
-        let path = real_path.to_string_lossy().to_owned().to_string();
+        let path = real_path.to_string_lossy().to_string();
         let script_name = path.trim_start_matches(&root).to_string();
 
         let saddr = req.app_config().local_addr();

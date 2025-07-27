@@ -35,6 +35,7 @@ name = "actix-fastcgi"
 version = "0.1.0"
 dependencies = [
  "actix-files",
+ "actix-http",
  "actix-service",
  "actix-web",
  "derive_more",

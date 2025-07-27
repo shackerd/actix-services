@@ -14,7 +14,7 @@ repository = "https://github.com/imgurbot12/actix-services/tree/master/actix-rew
 documentation = "https://docs.rs/actix-rewrite/"
 
 [dependencies]
-actix-http = "3.11.0"
+actix-http = { version = "3.11.0", default-features = false }
 actix-service = "2.0.3"
 actix-web = { version = "4.11.0", default-features = false }
 derive_more = { version = "2.0.1", features = ["display"] }
