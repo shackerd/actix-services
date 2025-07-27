@@ -51,7 +51,7 @@ impl Stream for RequestStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match Pin::new(&mut self.0).poll_next(cx) {
             Poll::Ready(Some(Ok(data))) => {
-                tracing::info!("data! {data:?}");
+                tracing::trace!("data! {data:?}");
                 Poll::Ready(Some(Ok(data)))
             }
             Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(io::Error::other(err)))),
@@ -145,7 +145,7 @@ impl Stream for ResponseStream {
                 }
                 Content::Stderr(data) => {
                     let message = std::str::from_utf8(&data);
-                    tracing::warn!(?message, "FastCGI Stderr");
+                    tracing::warn!("FastCGI Stderr {message:?}");
                     Poll::Ready(Some(Ok(Bytes::new())))
                 }
             },

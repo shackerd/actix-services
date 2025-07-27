@@ -30,6 +30,7 @@ pub struct FastCGI {
     mount_path: String,
     guards: Vec<Rc<dyn Guard>>,
     root: PathBuf,
+    indexes: Vec<String>,
     fastcgi_address: String,
 }
 
@@ -59,6 +60,7 @@ impl FastCGI {
             mount_path: mount_path.to_owned(),
             guards: Vec::new(),
             root,
+            indexes: Vec::new(),
             fastcgi_address: fastcgi_address.to_owned(),
         }
     }
@@ -82,6 +84,19 @@ impl FastCGI {
     /// ```
     pub fn guard<G: Guard + 'static>(mut self, guards: G) -> Self {
         self.guards.push(Rc::new(guards));
+        self
+    }
+
+    /// Set an index file
+    ///
+    /// Shows specific index file for directories instead of
+    /// showing files listing.
+    ///
+    /// This function can be called multiple times to configure
+    /// a list of index fallbacks with their priority set to the
+    /// order of their addition.
+    pub fn index_file<T: Into<String>>(mut self, index: T) -> Self {
+        self.indexes.push(index.into());
         self
     }
 }
@@ -121,6 +136,7 @@ impl ServiceFactory<ServiceRequest> for FastCGI {
     fn new_service(&self, _: ()) -> Self::Future {
         let inner = FastCGIInner {
             root: self.root.clone(),
+            indexes: self.indexes.clone(),
             fastcgi_address: self.fastcgi_address.clone(),
         };
         Box::pin(async move { Ok(FastCGIService(Rc::new(inner))) })

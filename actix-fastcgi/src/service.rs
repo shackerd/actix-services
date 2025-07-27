@@ -22,6 +22,19 @@ use super::stream::SockStream;
 pub struct FastCGIService(pub(crate) Rc<FastCGIInner>);
 
 impl FastCGIService {
+    /// Find first available index if path is a directory
+    pub fn find_index(&self, mut path: PathBuf) -> PathBuf {
+        if path.is_dir() {
+            path = self
+                .indexes
+                .iter()
+                .map(|index| path.join(index))
+                .find(|path| path.exists())
+                .unwrap_or(path);
+        }
+        path
+    }
+
     /// Fill Additional Paramters from Service Settings and Request Headers
     ///
     /// # Argument Order
@@ -30,16 +43,29 @@ impl FastCGIService {
     /// The second argument (`path`) is the valid uri path generated from the uri
     ///
     /// The third argument (`req`) is the http-request object to load data from
-    pub fn fill_params<'a>(&'a self, root: &'a Path, path: &Path, req: &HttpRequest) -> Params<'a> {
+    pub fn fill_params<'a>(&'a self, path: &Path, req: &HttpRequest) -> Params<'a> {
+        let mut real_path = self.root.join(path);
+        if real_path.is_dir() {
+            real_path = self
+                .indexes
+                .iter()
+                .map(|index| real_path.join(index))
+                .find(|path| path.exists())
+                .unwrap_or(real_path);
+        }
+
+        let root = self.root.to_string_lossy().to_string();
+        let path = real_path.to_string_lossy().to_owned().to_string();
+        let script_name = path.trim_start_matches(&root).to_string();
+
         let saddr = req.app_config().local_addr();
-        let script_name = format!("/{}", path.to_string_lossy());
         let mut params = Params::default()
             .document_uri(script_name.clone())
-            .document_root(self.root.to_string_lossy())
+            .document_root(root)
             .request_method(req.method().as_str().to_owned())
             .request_uri(req.uri().path().to_owned())
             .script_name(script_name)
-            .script_filename(root.to_string_lossy())
+            .script_filename(path)
             .server_name(req.connection_info().host().to_owned())
             .server_addr(saddr.ip().to_string())
             .server_port(saddr.port());
@@ -75,6 +101,7 @@ impl Deref for FastCGIService {
 
 pub struct FastCGIInner {
     pub(crate) root: PathBuf,
+    pub(crate) indexes: Vec<String>,
     pub(crate) fastcgi_address: String,
 }
 
@@ -89,9 +116,7 @@ impl Service<ServiceRequest> for FastCGIService {
         let this = self.clone();
         Box::pin(async move {
             let path_on_disk = PathBufWrap::parse_req(req.request(), false)?;
-
-            let root = this.root.join(&path_on_disk);
-            let params = this.fill_params(&root, path_on_disk.as_ref(), req.request());
+            let params = this.fill_params(path_on_disk.as_ref(), req.request());
 
             let sock = SockStream::connect(&this.fastcgi_address).await?;
             let client = Client::new(sock);
