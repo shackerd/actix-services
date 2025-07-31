@@ -14,6 +14,10 @@ pub enum Error {
     #[display("Stream Ended Unexpectedly")]
     UnexpectedEnd,
 
+    /// FastCGI Client Error
+    #[display("FastCGI Client Error")]
+    ClientError(fastcgi_client::ClientError),
+
     /// Unknown error within inner stream reader
     #[display("Error when processing stream")]
     Payload(PayloadError),

@@ -8,7 +8,6 @@ use std::{
 
 use actix_web::{
     HttpMessage, HttpResponse,
-    body::BodyStream,
     dev::ServiceRequest,
     error::PayloadError,
     http::StatusCode,
@@ -93,11 +92,6 @@ impl ResponseStream {
         Ok(())
     }
 
-    #[inline]
-    fn into_body(self) -> BodyStream<Self> {
-        BodyStream::new(self)
-    }
-
     /// Convert Stream Buffer into HttpResponse
     ///
     /// Internally writes stream stdout to temporary memory-buffer
@@ -122,7 +116,7 @@ impl ResponseStream {
             };
         }
 
-        Ok(builder.body(self.into_body()))
+        Ok(builder.streaming(self))
     }
 }
 

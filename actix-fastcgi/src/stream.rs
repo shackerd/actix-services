@@ -2,7 +2,10 @@
 
 use std::{
     io,
+    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
+    path::PathBuf,
     pin::Pin,
+    str::FromStr,
     task::{Context, Poll},
 };
 
@@ -14,12 +17,41 @@ use tokio::{
 
 use super::error::Error;
 
+/// Default socket address on failure to parse configured address
+pub(crate) const DEFAULT_ADDRESS: SocketAddr =
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000);
+
+/// Compiled Unix/TCP Socket Address
+#[derive(Clone)]
+pub enum StreamAddr {
+    Unix(PathBuf),
+    Tcp(Vec<SocketAddr>),
+}
+
+impl From<SocketAddr> for StreamAddr {
+    fn from(value: SocketAddr) -> Self {
+        Self::Tcp(vec![value])
+    }
+}
+
+impl FromStr for StreamAddr {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (scheme, addr) = s.split_once("://").unwrap_or(("tcp", s));
+        match &scheme.to_lowercase() == "unix" {
+            true => Ok(Self::Unix(PathBuf::from(addr))),
+            false => Ok(Self::Tcp(addr.to_socket_addrs()?.collect())),
+        }
+    }
+}
+
 /// Socket abstraction on [`TcpStream`](tokio::net::TcpStream) or
 /// [`UnixStream`](tokio::net::UnixStream)
 #[pin_project(project = AbsStreamProj)]
 pub enum SockStream {
     Unix(#[pin] UnixStream),
-    TCP(#[pin] TcpStream),
+    Tcp(#[pin] TcpStream),
 }
 
 impl SockStream {
@@ -37,11 +69,10 @@ impl SockStream {
     ///   Ok(())
     /// }
     /// ```
-    pub async fn connect(addr: &str) -> Result<Self, Error> {
-        let (scheme, addr) = addr.split_once("://").unwrap_or(("tcp", addr));
-        match &scheme.to_lowercase() == "unix" {
-            true => Ok(Self::Unix(UnixStream::connect(addr).await?)),
-            false => Ok(Self::TCP(TcpStream::connect(addr).await?)),
+    pub async fn connect(addr: &StreamAddr) -> Result<Self, Error> {
+        match addr {
+            StreamAddr::Unix(addr) => Ok(Self::Unix(UnixStream::connect(addr).await?)),
+            StreamAddr::Tcp(addr) => Ok(Self::Tcp(TcpStream::connect(&addr[..]).await?)),
         }
     }
 }
@@ -54,7 +85,7 @@ impl AsyncRead for SockStream {
     ) -> std::task::Poll<std::io::Result<()>> {
         match self.project() {
             AbsStreamProj::Unix(u) => u.poll_read(cx, buf),
-            AbsStreamProj::TCP(t) => t.poll_read(cx, buf),
+            AbsStreamProj::Tcp(t) => t.poll_read(cx, buf),
         }
     }
 }
@@ -67,7 +98,7 @@ impl AsyncWrite for SockStream {
     ) -> std::task::Poll<Result<usize, io::Error>> {
         match self.project() {
             AbsStreamProj::Unix(u) => u.poll_write(cx, buf),
-            AbsStreamProj::TCP(t) => t.poll_write(cx, buf),
+            AbsStreamProj::Tcp(t) => t.poll_write(cx, buf),
         }
     }
     fn poll_flush(
@@ -76,13 +107,13 @@ impl AsyncWrite for SockStream {
     ) -> std::task::Poll<Result<(), io::Error>> {
         match self.project() {
             AbsStreamProj::Unix(u) => u.poll_flush(cx),
-            AbsStreamProj::TCP(t) => t.poll_flush(cx),
+            AbsStreamProj::Tcp(t) => t.poll_flush(cx),
         }
     }
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         match self.project() {
             AbsStreamProj::Unix(u) => u.poll_shutdown(cx),
-            AbsStreamProj::TCP(t) => t.poll_shutdown(cx),
+            AbsStreamProj::Tcp(t) => t.poll_shutdown(cx),
         }
     }
 }

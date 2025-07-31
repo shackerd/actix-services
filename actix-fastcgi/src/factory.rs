@@ -1,6 +1,6 @@
 //! FastCGI Service Factory
 
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, rc::Rc, str::FromStr};
 
 use actix_service::ServiceFactory;
 use actix_web::{
@@ -9,6 +9,11 @@ use actix_web::{
     guard::Guard,
 };
 use futures_core::future::LocalBoxFuture;
+
+use crate::{
+    SockPool, pool,
+    stream::{DEFAULT_ADDRESS, StreamAddr},
+};
 
 use super::service::{FastCGIInner, FastCGIService};
 
@@ -31,7 +36,7 @@ pub struct FastCGI {
     guards: Vec<Rc<dyn Guard>>,
     root: PathBuf,
     indexes: Vec<String>,
-    fastcgi_address: String,
+    fastcgi_pool: SockPool,
 }
 
 impl FastCGI {
@@ -56,12 +61,20 @@ impl FastCGI {
                 PathBuf::new()
             }
         };
+        let fastcgi_address = match StreamAddr::from_str(fastcgi_address) {
+            Ok(addr) => addr,
+            Err(_) => {
+                tracing::error!("Specified address is not valid: {fastcgi_address:?}");
+                StreamAddr::from(DEFAULT_ADDRESS)
+            }
+        };
+        let mgr = pool::Manager(fastcgi_address);
         Self {
             mount_path: mount_path.to_owned(),
             guards: Vec::new(),
             root,
             indexes: Vec::new(),
-            fastcgi_address: fastcgi_address.to_owned(),
+            fastcgi_pool: SockPool::builder(mgr).build().unwrap(),
         }
     }
 
@@ -137,7 +150,7 @@ impl ServiceFactory<ServiceRequest> for FastCGI {
         let inner = FastCGIInner {
             root: self.root.clone(),
             indexes: self.indexes.clone(),
-            fastcgi_address: self.fastcgi_address.clone(),
+            fastcgi_pool: self.fastcgi_pool.clone(),
         };
         Box::pin(async move { Ok(FastCGIService(Rc::new(inner))) })
     }

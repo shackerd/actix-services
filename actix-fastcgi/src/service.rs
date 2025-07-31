@@ -9,32 +9,22 @@ use actix_web::{
     HttpRequest,
     body::BoxBody,
     dev::{self, Service, ServiceRequest, ServiceResponse},
-    error::Error,
+    error::Error as ActixError,
 };
+use deadpool::managed::Object;
 use fastcgi_client::{Client, Params, Request};
 use futures_core::future::LocalBoxFuture;
 
+use crate::{SockPool, pool};
+
+use super::error::Error;
 use super::payload::{RequestStream, ResponseStream};
-use super::stream::SockStream;
 
 /// Assembled fastcgi client service
 #[derive(Clone)]
 pub struct FastCGIService(pub(crate) Rc<FastCGIInner>);
 
 impl FastCGIService {
-    /// Find first available index if path is a directory
-    pub fn find_index(&self, mut path: PathBuf) -> PathBuf {
-        if path.is_dir() {
-            path = self
-                .indexes
-                .iter()
-                .map(|index| path.join(index))
-                .find(|path| path.exists())
-                .unwrap_or(path);
-        }
-        path
-    }
-
     /// Fill Additional Paramters from Service Settings and Request Headers
     ///
     /// # Argument Order
@@ -102,12 +92,12 @@ impl Deref for FastCGIService {
 pub struct FastCGIInner {
     pub(crate) root: PathBuf,
     pub(crate) indexes: Vec<String>,
-    pub(crate) fastcgi_address: String,
+    pub(crate) fastcgi_pool: SockPool,
 }
 
 impl Service<ServiceRequest> for FastCGIService {
     type Response = ServiceResponse<BoxBody>;
-    type Error = Error;
+    type Error = ActixError;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     dev::always_ready!();
@@ -118,13 +108,18 @@ impl Service<ServiceRequest> for FastCGIService {
             let path_on_disk = PathBufWrap::parse_req(req.request(), false)?;
             let params = this.fill_params(path_on_disk.as_ref(), req.request());
 
-            let sock = SockStream::connect(&this.fastcgi_address).await?;
+            let obj = this.fastcgi_pool.get().await.unwrap();
+            let sock = Object::<pool::Manager>::take(obj);
             let client = Client::new(sock);
 
             let stream = RequestStream::from_request(&mut req);
             let request = Request::new(params, stream.into_reader());
 
-            let stream = client.execute_once_stream(request).await.unwrap();
+            let stream = client
+                .execute_once_stream(request)
+                .await
+                .map_err(Error::ClientError)?;
+
             let http_res = ResponseStream::new(stream).into_response().await?;
 
             Ok(req.into_response(http_res))
