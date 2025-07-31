@@ -1,4 +1,4 @@
-use std::{fmt::Debug, rc::Rc};
+use std::{fmt::Debug, rc::Rc, str::FromStr};
 
 use actix_service::ServiceFactory;
 use actix_web::{
@@ -8,9 +8,11 @@ use actix_web::{
 };
 use awc::{
     Client,
-    http::{Uri, header::HeaderName},
+    http::{Uri, header},
 };
 use futures_core::future::LocalBoxFuture;
+
+use crate::service::HeaderVec;
 
 use super::service::{ProxyService, ProxyServiceInner};
 
@@ -33,7 +35,9 @@ pub struct RevProxy {
     guards: Vec<Rc<dyn Guard>>,
     client: Rc<Client>,
     resolve: Uri,
-    forward: Option<HeaderName>,
+    change_host: bool,
+    header_up: HeaderVec,
+    header_down: HeaderVec,
 }
 
 impl RevProxy {
@@ -54,9 +58,12 @@ impl RevProxy {
             guards: Vec::new(),
             client: Rc::new(awc::Client::new()),
             resolve: uri.try_into().expect("invalid resolution uri"),
-            forward: None,
+            change_host: false,
+            header_up: Vec::new(),
+            header_down: Vec::new(),
         }
     }
+
     /// Adds a routing guard.
     ///
     /// Use this to allow multiple chained services that respond to strictly different
@@ -78,6 +85,7 @@ impl RevProxy {
         self.guards.push(Rc::new(guards));
         self
     }
+
     /// Overrides the actix-web-client instance used by the proxy
     ///
     /// Default is [`Client::new()`](awc::Client::new)
@@ -85,11 +93,40 @@ impl RevProxy {
         self.client = Rc::new(client);
         self
     }
-    /// Specifies the header to pass proxy forwarding information for
+
+    /// Configure proxy to change hostname to the upstream host
     ///
-    /// Default is None
-    pub fn forward_header(mut self, forward: Option<HeaderName>) -> Self {
-        self.forward = forward;
+    /// Default is return the established hostname of the original request.
+    pub fn change_host(mut self) -> Self {
+        self.change_host = true;
+        self
+    }
+
+    /// Append a header to include in the upstream request.
+    pub fn append_upstream_header(mut self, name: &str, value: &str) -> Self {
+        let Ok(name) = header::HeaderName::from_str(name) else {
+            tracing::warn!("invalid upstream header name {name:?}");
+            return self;
+        };
+        let Ok(value) = header::HeaderValue::from_str(value) else {
+            tracing::warn!("invalid upstream header value {name:?}: {value:?}");
+            return self;
+        };
+        self.header_up.push((name, value));
+        self
+    }
+
+    /// Append a header to include in the downstream response.
+    pub fn append_downstream_header(mut self, name: &str, value: &str) -> Self {
+        let Ok(name) = header::HeaderName::from_str(name) else {
+            tracing::warn!("invalid downstream header name {name:?}");
+            return self;
+        };
+        let Ok(value) = header::HeaderValue::from_str(value) else {
+            tracing::warn!("invalid downstream header value {name:?}: {value:?}");
+            return self;
+        };
+        self.header_down.push((name, value));
         self
     }
 }
@@ -130,7 +167,9 @@ impl ServiceFactory<ServiceRequest> for RevProxy {
         let inner = ProxyServiceInner {
             client: self.client.clone(),
             resolve: self.resolve.clone(),
-            forward: self.forward.clone(),
+            change_host: self.change_host,
+            header_up: self.header_up.clone(),
+            header_down: self.header_down.clone(),
         };
         Box::pin(async move { Ok(ProxyService(Rc::new(inner))) })
     }

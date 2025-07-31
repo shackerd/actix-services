@@ -1,8 +1,13 @@
+//! Actix-Web Proxy Utilities
 use std::{collections::HashMap, path::PathBuf};
 
-use actix_web::web::Query;
+use actix_web::{
+    HttpMessage, HttpResponse,
+    web::{Bytes, Query},
+};
 use awc::{
-    error::HeaderValue,
+    Client, ClientRequest,
+    error::{HeaderValue, PayloadError},
     http::{
         Uri,
         header::{self, HeaderMap, HeaderName},
@@ -23,6 +28,56 @@ const HOP_HEADERS: [HeaderName; 9] = [
     header::HeaderName::from_static("keep-alive"),
     header::HeaderName::from_static("proxy-connection"),
 ];
+
+/// Trait for Converting [`actix_web::HttpRequest`] to [`awc::ClientRequest`]
+pub trait ClientReq {
+    type Error;
+
+    fn client_req(&self, client: &Client, url: Uri) -> Result<ClientRequest, Self::Error>;
+}
+
+/// Trait for Converting [`awc::ClientResponse`] to [`actix_web::HttpResponse`]
+pub trait ServerRes {
+    type Error;
+
+    fn server_response(self) -> Result<HttpResponse, Self::Error>;
+}
+
+impl ClientReq for actix_web::HttpRequest {
+    type Error = Error;
+
+    fn client_req(&self, client: &Client, url: Uri) -> Result<ClientRequest, Self::Error> {
+        let mut request = client.request_from(url, self.head());
+        remove_connection_headers(request.headers_mut())?;
+        remove_hop_headers(request.headers_mut());
+        Ok(request.camel_case())
+    }
+}
+
+impl<T> ServerRes for awc::ClientResponse<T>
+where
+    T: futures_core::Stream<Item = Result<Bytes, PayloadError>> + 'static,
+{
+    type Error = Error;
+
+    fn server_response(mut self) -> Result<HttpResponse, Self::Error> {
+        let payload = self.take_payload();
+
+        let mut builder = actix_web::HttpResponseBuilder::new(self.status());
+        for header in self.headers() {
+            builder.append_header(header);
+        }
+
+        let mut http_res = match self.headers().get(header::CONTENT_LENGTH) {
+            Some(value) if value.as_bytes() == b"0" => builder.body(()),
+            _ => builder.streaming(payload),
+        };
+
+        remove_connection_headers(http_res.headers_mut())?;
+        remove_hop_headers(http_res.headers_mut());
+        Ok(http_res)
+    }
+}
 
 type QueryMap = Query<HashMap<String, String>>;
 
@@ -47,7 +102,7 @@ pub fn combine_uri(proxy: &Uri, target: &Uri) -> Result<Uri, UriError> {
     Ok(Uri::builder()
         .scheme(proxy.scheme().cloned().unwrap_or(Scheme::HTTP))
         .authority(authority.clone())
-        .path_and_query(format!("{path}?{query}"))
+        .path_and_query(format!("{path}?{query}").trim_end_matches('?'))
         .build()?)
 }
 

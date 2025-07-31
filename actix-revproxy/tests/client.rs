@@ -24,7 +24,7 @@ pub struct HttpBinPost {
 async fn simple_get() {
     common::setup();
 
-    let proxy = RevProxy::new("", "http://example.com");
+    let proxy = RevProxy::new("", "http://example.com").change_host();
     let srv = test::init_service(actix_web::App::new().service(proxy)).await;
 
     let req = TestRequest::with_uri("/").to_request();
@@ -75,7 +75,7 @@ async fn simple_post() {
     let body = common::get_body(res).await;
     let post: HttpBinPost = serde_json::from_str(&body).expect("invalid json");
 
-    assert!(post.url.starts_with("http://httpbin.org/post?"));
+    assert!(post.url.starts_with("http://localhost/post"));
     assert_eq!(post.args.get("hello"), Some(&"world".to_string()));
     assert_eq!(post.args.get("a"), Some(&"b".to_string()));
     assert_eq!(post.data, "");

@@ -1,4 +1,4 @@
-//! Error and Result module
+//! Error and Result Types
 
 use actix_web::{ResponseError, error::QueryPayloadError};
 use awc::http::header::{InvalidHeaderValue, ToStrError};
@@ -19,6 +19,9 @@ pub enum Error {
 
     /// Failed to append new header
     InvalidHeaderValue(InvalidHeaderValue),
+
+    /// Failed to build uri error
+    UriError(UriError),
 }
 
 /// Errors which occur when building a combined proxied request uri

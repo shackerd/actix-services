@@ -1,24 +1,53 @@
 use std::{ops::Deref, rc::Rc};
 
 use actix_web::{
-    HttpMessage, HttpResponseBuilder,
+    HttpRequest,
     body::BoxBody,
     dev::{self, Service, ServiceRequest, ServiceResponse},
     error::Error as ActixError,
 };
 use awc::{
-    Client,
-    http::{Uri, header::HeaderName},
+    Client, ClientRequest,
+    http::{Uri, header},
 };
 use futures_core::future::LocalBoxFuture;
 
 use crate::error::Error;
+use crate::proxy::*;
 
-use super::proxy::*;
+pub type HeaderVec = Vec<(header::HeaderName, header::HeaderValue)>;
 
 /// Assembled reverse-proxy service
 #[derive(Clone)]
 pub struct ProxyService(pub(crate) Rc<ProxyServiceInner>);
+
+impl ProxyService {
+    /// Convert [`actix_web::HttpRequest`] into [`awc::ClientRequest`]
+    #[inline]
+    fn prepare_request(&self, req: &HttpRequest) -> Result<ClientRequest, Error> {
+        let info = req.connection_info().clone();
+        let uri = combine_uri(&self.resolve, req.uri())?;
+
+        let mut request = req.client_req(&self.client, uri)?.no_decompress();
+        if !self.change_host {
+            request = request.insert_header((header::HOST, info.host()))
+        }
+
+        if let Some(addr) = req.peer_addr() {
+            let ip = addr.ip().to_string();
+            let proto = request.get_uri().scheme_str().unwrap_or("http").to_owned();
+            request = request
+                .insert_header((header::X_FORWARDED_HOST, info.host()))
+                .insert_header((header::X_FORWARDED_PROTO, proto));
+            update_forwarded(request.headers_mut(), header::X_FORWARDED_FOR, ip)?;
+        }
+
+        Ok(self
+            .header_up
+            .iter()
+            .fold(request, |req, (k, v)| req.insert_header((k, v))))
+    }
+}
 
 impl Deref for ProxyService {
     type Target = ProxyServiceInner;
@@ -31,7 +60,9 @@ impl Deref for ProxyService {
 pub struct ProxyServiceInner {
     pub(crate) client: Rc<Client>,
     pub(crate) resolve: Uri,
-    pub(crate) forward: Option<HeaderName>,
+    pub(crate) change_host: bool,
+    pub(crate) header_up: HeaderVec,
+    pub(crate) header_down: HeaderVec,
 }
 
 impl Service<ServiceRequest> for ProxyService {
@@ -50,46 +81,20 @@ impl Service<ServiceRequest> for ProxyService {
                 .peer_addr()
                 .map(|addr| addr.to_string())
                 .unwrap_or_else(|| "<unknown>".to_owned());
+            let request = this.prepare_request(&http_req)?;
 
-            let uri = combine_uri(&this.resolve, http_req.uri())?;
-            tracing::debug!("{addr} {:?} {uri:?}", http_req.method());
-            let mut request = this
-                .client
-                .request(http_req.method().clone(), uri)
-                .no_decompress();
-
-            for header in http_req.headers() {
-                request = request.append_header(header);
-            }
-            remove_connection_headers(request.headers_mut())?;
-            remove_hop_headers(request.headers_mut());
-
-            if let Some(forward) = this.forward.as_ref() {
-                if let Some(addr) = http_req.peer_addr() {
-                    let ip = addr.ip().to_string();
-                    update_forwarded(request.headers_mut(), forward.clone(), ip)?;
-                }
-            }
-
+            tracing::debug!("{addr} {:?} {:?}", http_req.method(), request.get_uri());
             tracing::trace!(?addr, ?request);
-            let mut response = request
+            let response = request
                 .send_stream(payload)
                 .await
                 .map_err(Error::FailedRequest)?;
             tracing::trace!(?addr, ?response);
 
-            let payload = response.take_payload();
-            let body = actix_web::body::BodyStream::new(payload);
-
-            let mut builder = HttpResponseBuilder::new(response.status());
-            for header in response.headers() {
-                builder.append_header(header);
+            let mut http_res = response.server_response()?;
+            for (name, value) in this.header_down.clone() {
+                http_res.headers_mut().insert(name, value);
             }
-
-            let mut http_res = builder.body(body);
-            remove_connection_headers(http_res.headers_mut())?;
-            remove_hop_headers(http_res.headers_mut());
-
             Ok(ServiceResponse::new(http_req, http_res))
         })
     }
