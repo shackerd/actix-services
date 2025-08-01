@@ -24,7 +24,7 @@ pub struct HttpBinPost {
 async fn simple_get() {
     common::setup();
 
-    let proxy = RevProxy::new("", "http://example.com").change_host();
+    let proxy = RevProxy::new("", "http://www.example.com").change_host();
     let srv = test::init_service(actix_web::App::new().service(proxy)).await;
 
     let req = TestRequest::with_uri("/").to_request();
