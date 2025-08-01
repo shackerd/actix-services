@@ -3,7 +3,7 @@
 use std::{
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     str::FromStr,
     task::{Context, Poll},
@@ -28,21 +28,45 @@ pub enum StreamAddr {
     Tcp(Vec<SocketAddr>),
 }
 
+impl From<&Path> for StreamAddr {
+    #[inline]
+    fn from(value: &Path) -> Self {
+        Self::Unix(value.to_path_buf())
+    }
+}
+
+impl From<PathBuf> for StreamAddr {
+    #[inline]
+    fn from(value: PathBuf) -> Self {
+        Self::Unix(value)
+    }
+}
+
 impl From<SocketAddr> for StreamAddr {
+    #[inline]
     fn from(value: SocketAddr) -> Self {
         Self::Tcp(vec![value])
+    }
+}
+
+impl TryFrom<&str> for StreamAddr {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let (scheme, addr) = value.split_once("://").unwrap_or(("tcp", value));
+        match &scheme.to_lowercase() == "unix" {
+            true => Ok(Self::Unix(PathBuf::from(addr))),
+            false => Ok(Self::Tcp(addr.to_socket_addrs()?.collect())),
+        }
     }
 }
 
 impl FromStr for StreamAddr {
     type Err = Error;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (scheme, addr) = s.split_once("://").unwrap_or(("tcp", s));
-        match &scheme.to_lowercase() == "unix" {
-            true => Ok(Self::Unix(PathBuf::from(addr))),
-            false => Ok(Self::Tcp(addr.to_socket_addrs()?.collect())),
-        }
+        s.try_into()
     }
 }
 
@@ -60,12 +84,14 @@ impl SockStream {
     /// # Examples
     ///
     /// ```
+    /// use std::path::PathBuf;
     /// use actix_fastcgi::{SockStream, Error};
     ///
     /// async fn connect() -> Result<(), Error> {
-    ///   let unix = SockStream::connect("unix:///var/run/program.sock").await?;
-    ///   let tcp  = SockStream::connect("tcp://localhost:9000").await?;
-    ///   let tcp2 = SockStream::connect("192.168.0.2:9000").await?;
+    ///   let unix  = SockStream::connect(&"unix:///var/run/program.sock".try_into()?).await?;
+    ///   let unix2 = SockStream::connect(&PathBuf::from("/var/run/program.sock").into()).await?;
+    ///   let tcp   = SockStream::connect(&"tcp://localhost:9000".try_into()?).await?;
+    ///   let tcp2  = SockStream::connect(&"192.168.0.2:9000".try_into()?).await?;
     ///   Ok(())
     /// }
     /// ```

@@ -1,6 +1,6 @@
 //! FastCGI Service Factory
 
-use std::{path::PathBuf, rc::Rc, str::FromStr};
+use std::{path::PathBuf, rc::Rc};
 
 use actix_service::ServiceFactory;
 use actix_web::{
@@ -61,7 +61,7 @@ impl FastCGI {
                 PathBuf::new()
             }
         };
-        let fastcgi_address = match StreamAddr::from_str(fastcgi_address) {
+        let fastcgi_address = match StreamAddr::try_from(fastcgi_address) {
             Ok(addr) => addr,
             Err(_) => {
                 tracing::error!("Specified address is not valid: {fastcgi_address:?}");

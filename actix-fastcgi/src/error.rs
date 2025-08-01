@@ -31,6 +31,12 @@ pub enum Error {
     StatusCode(http::status::InvalidStatusCode),
 }
 
+impl From<std::convert::Infallible> for Error {
+    fn from(_value: std::convert::Infallible) -> Self {
+        panic!("Infallible!")
+    }
+}
+
 impl ResponseError for Error {
     /// Returns `500 Internal Server Error`.
     fn status_code(&self) -> actix_web::http::StatusCode {
