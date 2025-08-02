@@ -9,7 +9,7 @@ use actix_web::{
 };
 use futures_core::future::LocalBoxFuture;
 
-use crate::{link::Link, next::Next, service::HttpService};
+use crate::{link::Link, next::Next, service::HttpService, wrap::Wrappable};
 
 use super::service::{ChainInner, ChainService};
 
@@ -119,7 +119,7 @@ impl Chain {
     ///     .wrap(middleware::Logger::default());
     /// ```
     #[inline]
-    pub fn wrap<M, B>(mut self, middleware: M) -> Chain
+    pub fn wrap<M, B>(self, middleware: M) -> Chain
     where
         M: Transform<
                 HttpService,
@@ -130,14 +130,7 @@ impl Chain {
             > + 'static,
         B: MessageBody + 'static,
     {
-        let prefix = self.mount_path.clone();
-        let guards: Vec<_> = self.guards.drain(0..).collect();
-        let next: Vec<_> = self.next.drain(0..).collect();
-        let link = Link::from(self).wrap(middleware);
-        let mut chain = Chain::new(&prefix).link(link);
-        chain.next = next;
-        chain.guards = guards;
-        chain
+        self.wrap_with(middleware)
     }
 
     /// Add a new [`Link`] to the established chain.
@@ -152,6 +145,30 @@ impl Chain {
     pub fn push_link(&mut self, link: Link) -> &mut Self {
         self.links.push(link);
         self
+    }
+}
+
+impl Wrappable for Chain {
+    /// See [`Chain::wrap`] for more information.
+    fn wrap_with<M, B>(mut self, middleware: M) -> Chain
+    where
+        M: Transform<
+                HttpService,
+                ServiceRequest,
+                Response = ServiceResponse<B>,
+                Error = Error,
+                InitError = (),
+            > + 'static,
+        B: MessageBody + 'static,
+    {
+        let prefix = self.mount_path.clone();
+        let guards: Vec<_> = self.guards.drain(0..).collect();
+        let next: Vec<_> = self.next.drain(0..).collect();
+        let link = Link::from(self).wrap_with(middleware);
+        let mut chain = Chain::new(&prefix).link(link);
+        chain.next = next;
+        chain.guards = guards;
+        chain
     }
 }
 

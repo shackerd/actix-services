@@ -15,6 +15,7 @@ use crate::{
     Chain,
     next::{IsStatus, Next},
     service::{HttpNewService, HttpService},
+    wrap::Wrappable,
 };
 
 /// A single [`Link`] in the greater [`Chain`](crate::Chain)
@@ -42,7 +43,7 @@ pub struct Link {
     pub(crate) prefix: String,
     pub(crate) guards: Vec<Rc<dyn Guard>>,
     pub(crate) next: Vec<Rc<dyn Next>>,
-    service: Rc<HttpNewService>,
+    pub(crate) service: Rc<HttpNewService>,
 }
 
 #[inline]
@@ -162,7 +163,7 @@ impl Link {
     ///     .prefix("/index.html");
     ///```
     #[inline]
-    pub fn wrap<M, B>(mut self, middleware: M) -> Self
+    pub fn wrap<M, B>(self, middleware: M) -> Self
     where
         M: Transform<
                 HttpService,
@@ -173,9 +174,7 @@ impl Link {
             > + 'static,
         B: MessageBody + 'static,
     {
-        let svc = actix_service::apply(Compat::new(middleware), self.service.clone());
-        self.service = box_factory(svc);
-        self
+        self.wrap_with(middleware)
     }
 
     /// Convert public [`Link`] builder into [`LinkInner`]
@@ -197,6 +196,25 @@ impl Link {
             prefix: self.prefix.clone(),
             service: Rc::new(self.service.new_service(()).await?),
         })
+    }
+}
+
+impl Wrappable for Link {
+    /// See [`Link::wrap`] for more information.
+    fn wrap_with<M, B>(mut self, middleware: M) -> Self
+    where
+        M: Transform<
+                HttpService,
+                ServiceRequest,
+                Response = ServiceResponse<B>,
+                Error = Error,
+                InitError = (),
+            > + 'static,
+        B: MessageBody + 'static,
+    {
+        let svc = actix_service::apply(Compat::new(middleware), self.service.clone());
+        self.service = box_factory(svc);
+        self
     }
 }
 
