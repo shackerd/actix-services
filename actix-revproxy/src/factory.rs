@@ -103,7 +103,7 @@ impl RevProxy {
     }
 
     /// Append a header to include in the upstream request.
-    pub fn append_upstream_header(mut self, name: &str, value: &str) -> Self {
+    pub fn upstream_header(mut self, name: &str, value: &str) -> Self {
         let Ok(name) = header::HeaderName::from_str(name) else {
             tracing::warn!("invalid upstream header name {name:?}");
             return self;
@@ -117,7 +117,7 @@ impl RevProxy {
     }
 
     /// Append a header to include in the downstream response.
-    pub fn append_downstream_header(mut self, name: &str, value: &str) -> Self {
+    pub fn downstream_header(mut self, name: &str, value: &str) -> Self {
         let Ok(name) = header::HeaderName::from_str(name) else {
             tracing::warn!("invalid downstream header name {name:?}");
             return self;

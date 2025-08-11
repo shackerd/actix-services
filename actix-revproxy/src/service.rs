@@ -42,10 +42,13 @@ impl ProxyService {
             update_forwarded(request.headers_mut(), header::X_FORWARDED_FOR, ip)?;
         }
 
-        Ok(self
-            .header_up
-            .iter()
-            .fold(request, |req, (k, v)| req.insert_header((k, v))))
+        for (name, value) in self.header_up.clone() {
+            match value.is_empty() {
+                true => request.headers_mut().remove(name),
+                false => request.headers_mut().insert(name, value),
+            };
+        }
+        Ok(request)
     }
 }
 
@@ -93,7 +96,10 @@ impl Service<ServiceRequest> for ProxyService {
 
             let mut http_res = response.server_response()?;
             for (name, value) in this.header_down.clone() {
-                http_res.headers_mut().insert(name, value);
+                match value.is_empty() {
+                    true => http_res.headers_mut().remove(name),
+                    false => http_res.headers_mut().insert(name, value),
+                };
             }
             Ok(ServiceResponse::new(http_req, http_res))
         })
