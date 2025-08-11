@@ -7,7 +7,7 @@ use actix_web::{
 
 use crate::service::HttpService;
 
-/// Trait Abstraction for Middlware Compatible Objects
+/// Trait Abstraction for Middleware Compatible Objects
 pub trait Wrappable {
     fn wrap_with<M, B>(self, middleware: M) -> Self
     where
