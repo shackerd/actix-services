@@ -112,6 +112,7 @@ pub struct Basic {
 }
 
 /// Basic Auth [`Authenticator`] implementation.
+#[cfg(feature = "basic_session")]
 #[derive(Clone)]
 pub struct BasicAuth(Arc<Mutex<Basic>>);
 
@@ -222,6 +223,7 @@ impl Basic {
     }
 
     /// Build into [`BasicAuthSession`] authorizor instance.
+    #[cfg(feature = "basic_session")]
     pub fn build_session(self) -> BasicAuthSession {
         BasicAuthSession(Arc::new(Mutex::new(self)))
     }
@@ -247,6 +249,7 @@ impl Authenticator for BasicAuth {
     }
 }
 
+#[cfg(feature = "basic_session")]
 impl Authenticator for BasicAuthSession {
     async fn authorize(&self, req: &HttpRequest) -> Result<bool, Error> {
         let session = actix_session::Session::extract(req).await?;
