@@ -22,11 +22,11 @@ Provides a non-blocking middleware for securing endpoints with authentication.
 
 ```rust
 use actix_web::App;
-use actix_authn::{Authn, basic::{Basic, Passwd}};
+use actix_authn::{Authn, basic::{Basic, crypt}};
 
 /// passwords should be generated outside of HttpServer::new
 /// or use [`Basic::passwd`] or [`Basic::htpasswd`].
-let passwd = Passwd::new("admin");
+let passwd = crypt::bcrypt::hash("admin").unwrap();
 
 let app = App::new()
     .wrap(Authn::new(Basic::default().auth("admin", passwd).build()));

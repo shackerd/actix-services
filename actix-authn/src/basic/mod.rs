@@ -3,7 +3,6 @@
 use std::{
     collections::HashMap,
     path::Path,
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -18,66 +17,8 @@ mod cache;
 
 use crate::Authenticator;
 
-/// Hashed Password Object
-#[derive(Clone, Debug)]
-pub enum Passwd {
-    Md5(String),
-    Sha1(String),
-    Sha256(String),
-    Sha512(String),
-    Bcrypt(String),
-}
-
-impl Passwd {
-    /// Generate a new hashed password using the [bcrypt](https://docs.rs/bcrypt/latest/bcrypt/)
-    /// algorithm
-    pub fn new(secret: &str) -> Self {
-        Self::Bcrypt(pwhash::bcrypt::hash(secret).expect("bcrypt hash failed"))
-    }
-
-    /// Verify the supplied secret matches this hashed password
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use actix_authn::basic::Passwd;
-    ///
-    /// let passwd = Passwd::new("password");
-    /// assert!(passwd.verify("password"));        // true!
-    /// assert!(!passwd.verify("wrong-password")); // false!
-    /// ```
-    pub fn verify(&self, secret: &str) -> bool {
-        match self {
-            Self::Md5(hash) => pwhash::md5_crypt::verify(secret, hash),
-            Self::Sha1(hash) => pwhash::sha1_crypt::verify(secret, hash),
-            Self::Sha256(hash) => pwhash::sha256_crypt::verify(secret, hash),
-            Self::Sha512(hash) => pwhash::sha512_crypt::verify(secret, hash),
-            Self::Bcrypt(hash) => pwhash::bcrypt::verify(secret, hash),
-        }
-    }
-}
-
-impl FromStr for Passwd {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("{SHA}") {
-            return Ok(Self::Sha1(s.to_owned()));
-        }
-        let (id, _) = s
-            .trim_start_matches('$')
-            .split_once('$')
-            .ok_or("Missing HashId")?;
-        match id {
-            "md5" | "1" => Ok(Self::Md5(s.to_owned())),
-            "sha1" => Ok(Self::Sha1(s.to_owned())),
-            "2" | "2a" | "2b" | "2x" | "2y" => Ok(Self::Bcrypt(s.to_owned())),
-            "sha256" | "5" => Ok(Self::Sha256(s.to_owned())),
-            "sha512" | "6" => Ok(Self::Sha512(s.to_owned())),
-            _ => Err("Unsupported HashId"),
-        }
-    }
-}
+/// Re-export crypt3 crypt and Hash
+pub use crypt3_rs::{Hash, crypt};
 
 /// Basic Authentication [`Authenticator`] builder.
 ///
@@ -85,11 +26,11 @@ impl FromStr for Passwd {
 ///
 /// ```
 /// use actix_web::App;
-/// use actix_authn::{Authn, basic::{Basic, Passwd}};
+/// use actix_authn::{Authn, basic::{Basic, crypt}};
 ///
 /// /// passwords should be generated outside of HttpServer::new
 /// /// or use [`Basic::passwd`] or [`Basic::htpasswd`].
-/// let passwd = Passwd::new("admin");
+/// let passwd = crypt::bcrypt::hash("password").unwrap();
 ///
 /// // basic authorization
 /// let app = App::new()
@@ -97,7 +38,7 @@ impl FromStr for Passwd {
 ///
 /// // basic authorization w/ cookie based session
 /// // (this requires https://crates.io/crates/actix-session as well)
-/// let passwd = Passwd::new("admin");
+/// let passwd = crypt::bcrypt::hash("admin").unwrap();
 /// let key = actix_web::cookie::Key::generate();
 /// let store = actix_session::storage::CookieSessionStore::default();
 /// let app = App::new()
@@ -107,7 +48,7 @@ impl FromStr for Passwd {
 #[derive(Default)]
 pub struct Basic {
     realm: Option<String>,
-    auth: HashMap<String, Passwd>,
+    auth: HashMap<String, Hash>,
     cache: cache::AuthCache<bool>,
 }
 
@@ -147,9 +88,9 @@ impl Basic {
         self
     }
 
-    /// Supply pre-hashed [`Passwd`] with username as an allowed credential.
-    pub fn auth(mut self, user: &str, passwd: Passwd) -> Self {
-        self.auth.insert(user.to_owned(), passwd);
+    /// Supply pre-hashed [`enum@Hash`] with username as an allowed credential.
+    pub fn auth(mut self, user: &str, hash: Hash) -> Self {
+        self.auth.insert(user.to_owned(), hash);
         self
     }
 
@@ -168,7 +109,7 @@ impl Basic {
             .trim()
             .split_once(':')
             .expect("invalid htpasswd contents");
-        let passwd = Passwd::from_str(secret).expect("invalid passwd");
+        let passwd = Hash::try_from(secret).expect("invalid passwd");
         self.auth(user, passwd)
     }
 
