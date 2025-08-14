@@ -40,11 +40,14 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let this = Rc::clone(&self.0);
         Box::pin(async move {
-            let res = this.service.call(req).await.map_err(SanitizedError::from)?;
-            let (http_req, mut http_res) = res.into_parts();
+            let res = this.service.call(req).await.map_err(|err| {
+                tracing::error!("captured: {err:?}");
+                SanitizedError::from(err)
+            })?;
 
+            let (http_req, mut http_res) = res.into_parts();
             if let Some(err) = http_res.error() {
-                tracing::debug!("sanitized error: {err}");
+                tracing::error!("sanitized: {err}");
                 http_res = SanitizedError::empty(http_res);
                 return Ok(ServiceResponse::new(http_req, http_res));
             }
@@ -54,7 +57,7 @@ where
 
                 let (res, content) = http_res.into_parts();
                 let message = to_bytes_limited(content, 250).await;
-                tracing::debug!("sanitized error: {message:?}");
+                tracing::error!("sanitized: {message:?}");
 
                 http_res = SanitizedError::empty(res);
             }

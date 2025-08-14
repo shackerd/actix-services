@@ -723,9 +723,9 @@ dependencies = [
 
 [[package]]
 name = "crypt3_rs"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb5830c6c67710caf936fc32a3c153dd5af8b7eb7218575bbcd3b4f1bb77a1db"
+checksum = "f46daae2230bccc0e33021a0b960fc2001818e199fb99fa5de9bf8be27733d3a"
 dependencies = [
  "blowfish",
  "byteorder",
