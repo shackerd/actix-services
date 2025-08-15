@@ -38,6 +38,7 @@ impl ModSecurity {
             config: TransactionConfig::default(),
             rules: modsecurity::Rules::new(),
             security: modsecurity::ModSecurity::builder()
+                .with_log_callbacks()
                 .with_connector_info(CONNECTION_INFO)
                 .expect("failed to add connector into")
                 .build(),
