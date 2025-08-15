@@ -151,7 +151,7 @@ impl Basic {
     }
 
     pub(crate) fn prompt(&self) -> HttpResponse {
-        let realm = self.realm.as_ref().map(|s| s.as_str()).unwrap_or_default();
+        let realm = self.realm.as_deref().unwrap_or_default();
         let auth = format!("Basic realm={realm:?}, charset={:?}", "UTF-8");
         HttpResponse::Unauthorized()
             .insert_header((header::WWW_AUTHENTICATE, auth))
