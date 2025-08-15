@@ -41,13 +41,18 @@ where
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let this = Rc::clone(&self.0);
         Box::pin(async move {
-            let after = match this.engine.rewrite(req.request())? {
+            let after = match this
+                .engine
+                .rewrite(req.request())
+                .inspect_err(|err| tracing::error!("rewrite failed {err:?}"))?
+            {
                 Rewrite::Uri(uri) => uri,
                 Rewrite::Redirect(res) => return Ok(req.into_response(res)),
                 Rewrite::Response(res) => return Ok(req.into_response(res)),
             };
 
-            let uri = util::join_uri(req.uri(), &after)?;
+            let uri = util::join_uri(req.uri(), &after)
+                .inspect_err(|err| tracing::error!("url join failed: {err:?}"))?;
             req.head_mut().uri = uri.clone();
             *req.match_info_mut() = Path::new(Url::new(uri));
 

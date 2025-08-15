@@ -105,7 +105,8 @@ impl Service<ServiceRequest> for FastCGIService {
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let this = self.clone();
         Box::pin(async move {
-            let path_on_disk = PathBufWrap::parse_req(req.request(), false)?;
+            let path_on_disk = PathBufWrap::parse_req(req.request(), false)
+                .inspect_err(|err| tracing::error!("invalid request: {err:?}"))?;
             let params = this.fill_params(path_on_disk.as_ref(), req.request());
 
             let obj = this.fastcgi_pool.get().await.unwrap();
@@ -118,9 +119,13 @@ impl Service<ServiceRequest> for FastCGIService {
             let stream = client
                 .execute_once_stream(request)
                 .await
-                .map_err(Error::ClientError)?;
+                .map_err(Error::ClientError)
+                .inspect_err(|err| tracing::error!("request error: {err:?}"))?;
 
-            let http_res = ResponseStream::new(stream).into_response().await?;
+            let http_res = ResponseStream::new(stream)
+                .into_response()
+                .await
+                .inspect_err(|err| tracing::error!("invalid response: {err:?}"))?;
 
             Ok(req.into_response(http_res))
         })

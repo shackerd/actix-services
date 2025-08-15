@@ -41,8 +41,17 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let this = Rc::clone(&self.0);
         Box::pin(async move {
-            if !this.authn.authorize(req.request()).await? {
-                let res = this.authn.prompt(req.request()).await?;
+            if !this
+                .authn
+                .authorize(req.request())
+                .await
+                .inspect_err(|err| tracing::error!("auth failed: {err:?}"))?
+            {
+                let res = this
+                    .authn
+                    .prompt(req.request())
+                    .await
+                    .inspect_err(|err| tracing::error!("prompt failed: {err:?}"))?;
                 return Ok(req.into_response(res));
             }
             this.service.call(req).await

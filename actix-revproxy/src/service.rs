@@ -84,17 +84,22 @@ impl Service<ServiceRequest> for ProxyService {
                 .peer_addr()
                 .map(|addr| addr.to_string())
                 .unwrap_or_else(|| "<unknown>".to_owned());
-            let request = this.prepare_request(&http_req)?;
+            let request = this
+                .prepare_request(&http_req)
+                .inspect_err(|err| tracing::error!("invalid request: {err:?}"))?;
 
             tracing::debug!("{addr} {:?} {:?}", http_req.method(), request.get_uri());
             tracing::trace!(?addr, ?request);
             let response = request
                 .send_stream(payload)
                 .await
-                .map_err(Error::FailedRequest)?;
+                .map_err(Error::FailedRequest)
+                .inspect_err(|err| tracing::error!("request failed: {err:?}"))?;
             tracing::trace!(?addr, ?response);
 
-            let mut http_res = response.server_response()?;
+            let mut http_res = response
+                .server_response()
+                .inspect_err(|err| tracing::error!("invalid response: {err:?}"))?;
             for (name, value) in this.header_down.clone() {
                 match value.is_empty() {
                     true => http_res.headers_mut().remove(name),

@@ -41,13 +41,13 @@ where
         let this = Rc::clone(&self.0);
         Box::pin(async move {
             let res = this.service.call(req).await.map_err(|err| {
-                tracing::error!("captured: {err:?}");
+                tracing::debug!("captured: {err:?}");
                 SanitizedError::from(err)
             })?;
 
             let (http_req, mut http_res) = res.into_parts();
             if let Some(err) = http_res.error() {
-                tracing::error!("sanitized: {err}");
+                tracing::debug!("sanitized: {err}");
                 http_res = SanitizedError::empty(http_res);
                 return Ok(ServiceResponse::new(http_req, http_res));
             }
@@ -57,7 +57,7 @@ where
 
                 let (res, content) = http_res.into_parts();
                 let message = to_bytes_limited(content, 250).await;
-                tracing::error!("sanitized: {message:?}");
+                tracing::debug!("sanitized: {message:?}");
 
                 http_res = SanitizedError::empty(res);
             }
