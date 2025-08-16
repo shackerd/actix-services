@@ -1,0 +1,3 @@
+[submodule "includes/rust_rewrite"]
+	path = includes/rust_rewrite
+	url = git@github.com:shackerd/rust_rewrite.git

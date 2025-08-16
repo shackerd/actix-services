@@ -19,6 +19,7 @@ pub enum Rewrite {
     Response(HttpResponse),
 }
 
+#[derive(Clone)]
 /// Actix-Web compatible wrapper on [`Engine`](mod_rewrite::Engine)
 pub struct Engine {
     engine: mod_rewrite::Engine,
