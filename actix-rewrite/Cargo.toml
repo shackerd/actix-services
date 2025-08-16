@@ -17,7 +17,7 @@ actix-service = "2.0.3"
 actix-web = { version = "4.11.0", default-features = false }
 derive_more = { version = "2.0.1", features = ["display"] }
 futures-core = { version = "0.3.31", default-features = false }
-mod_rewrite = { version = "*", path = "includes/rust_rewrite" }
+mod_rewrite = { version = "*", path = "../includes/rust_rewrite" }
 serde_urlencoded = "0.7.1"
 tracing = "0.1.41"
 
